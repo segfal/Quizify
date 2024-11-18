@@ -13,6 +13,9 @@ interface JoinQuizModalProps {
   onClose: () => void;
 }
 
+
+// TODO: Save quizzes to Supabase
+
 export default function JoinQuizModal({ isOpen, onClose }: JoinQuizModalProps) {
   const { theme } = useTheme();
   const router = useRouter();
