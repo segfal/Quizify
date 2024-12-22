@@ -2,20 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 6.7%; /* #111111 */
+    --card-foreground: 0 0% 100%;
+    --border-radius: 20px;
   }
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: black;
+  color: white;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom card styling */
+.card {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--border-radius);
+}
+
+/* Add to your existing globals.css */
+@keyframes success-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.success {
+    animation: success-pulse 1.5s infinite;
+}
+
+.gif-container {
+    mask-image: linear-gradient(to bottom, 
+        transparent 0%,
+        black 20%,
+        black 80%,
+        transparent 100%
+    );
+}
+
+/* Improve background animations performance */
+.animated-background * {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+}
+
+@keyframes error-shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.error-shake {
+    animation: error-shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Improve GIF container styling */
+.gif-container {
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(5px);
 }

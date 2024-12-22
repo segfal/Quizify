@@ -1,13 +1,9 @@
-'use client'
-import { useRouter } from "next/navigation";
-import LandingPage from "./components/LandingPage";
+//shadcn/ui card component
+"use client";
+import LandingPage from "./LandingPage";
 
 const Home = () => {
-  return (
-    <main>
-      <LandingPage />
-    </main>
-  );
-}
+  return <LandingPage />;
+};
 
 export default Home;
