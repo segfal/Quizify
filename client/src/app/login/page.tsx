@@ -107,7 +107,7 @@ export default function LoginPage() {
 
                         <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10">
                             <p className="text-white/80 text-sm text-center font-medium">
-                                Super Easy Login Credentials:
+                                Login Credentials:
                             </p>
                             <div className="mt-2 space-y-1 text-center">
                                 <p className="text-emerald-400/90 text-sm">
@@ -119,7 +119,7 @@ export default function LoginPage() {
                                     password: <span className="font-mono bg-white/5 px-2 py-0.5 rounded">password</span>
                                 </p>
                                 <p className="text-white/60 text-xs italic mt-2">
-                                    (Hint: What could possibly be the password for "password"? 🤔)
+                                    (Hint: The password is above)
                                 </p>
                             </div>
                         </div>
