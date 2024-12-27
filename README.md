@@ -16,7 +16,7 @@ A modern quiz application with high-performance whiteboard capabilities, built w
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: Next.js 15, React, TypeScript
+- **Frontend**: Next.js 13+, React, TypeScript
 - **Styling**: Tailwind CSS, CSS Modules
 - **State Management**: React Context, SWR
 - **Performance**: C++ WebAssembly
@@ -31,7 +31,7 @@ A modern quiz application with high-performance whiteboard capabilities, built w
 - C++ compiler (Clang or GCC)
 - Emscripten SDK
 - AWS Account (for S3 integration)
-- npm
+- pnpm (recommended) or npm
 
 ## 🔧 Installation
 
@@ -43,7 +43,7 @@ A modern quiz application with high-performance whiteboard capabilities, built w
 
 2. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. **Install Emscripten SDK**
@@ -78,7 +78,7 @@ A modern quiz application with high-performance whiteboard capabilities, built w
 
 6. **Run the development server**
    ```bash
-   npm run dev
+   pnpm dev
    ```
 
 ## 🏗️ Project Structure
@@ -145,25 +145,25 @@ See [SYSTEM_DESIGN.md](./client/docs/SYSTEM_DESIGN.md) for detailed system archi
 
 2. Make changes and test
    ```bash
-   npm run test
-   npm run lint
+   pnpm test
+   pnpm lint
    ```
 
 3. Build and verify
    ```bash
-   npm run build
+   pnpm build
    ```
 
 ## 📦 Deployment
 
 1. **Build the application**
    ```bash
-   npm run build
+   pnpm build
    ```
 
 2. **Deploy to production**
    ```bash
-   npm run deploy
+   pnpm deploy
    ```
 
 ## 🔜 Contributing
@@ -177,3 +177,9 @@ See [SYSTEM_DESIGN.md](./client/docs/SYSTEM_DESIGN.md) for detailed system archi
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+For support, email support@quizify.com or join our Slack channel.
+
+

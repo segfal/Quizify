@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
+
 export default function RoomPage() {
     const router = useRouter();
     const [roomName, setRoomName] = useState('');
@@ -27,7 +28,7 @@ export default function RoomPage() {
         try {
             // For now, we'll just redirect to a test room
             const roomId = '1'; // In real app, this would be generated
-            router.push(`/dashboard/room/${roomId}`);
+            router.push(`/dashboard/room/${roomId}`); // Redirect to the room
         } catch (error) {
             toast.error('Failed to create room');
             setIsCreating(false);

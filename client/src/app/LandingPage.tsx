@@ -5,12 +5,21 @@ import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import { motion } from "framer-motion";
 import { LoginButton } from "@/components/ui/LoginButton";
 
+
+/**
+ * @brief Landing page for the application
+ * @details This page is the landing page for the application
+ * 
+ * 
+ * 
+ */
+
 // Define card data structure for easy maintenance
 interface FeatureCard {
-    title: string;
-    description: string;
-    icon: string;
-    borderColor: string;
+    title: string; // Title of the feature
+    description: string; // Description of the feature
+    icon: string; // Icon for the feature
+    borderColor: string; // Border color for the feature
 }
 
 // Card data array with consistent styling

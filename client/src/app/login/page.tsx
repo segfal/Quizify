@@ -7,49 +7,41 @@ import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import { AnimatedLoginError } from "@/components/ui/AnimatedLoginError";
 import { useRouter } from "next/navigation";
 import { AnimatedErrorBackground } from "@/components/ui/AnimatedErrorBackground";
+import { useSupabase } from "@/contexts/SupabaseContext";
 
-// Dummy users array with easy credentials
-const USERS = [
-    { email: "user@example.com", username: "user", password: "123" },
-    { email: "test@test.com", username: "test", password: "test" },
-    { email: "admin@admin.com", username: "admin", password: "admin" },
-    { email: "a", username: "a", password: "a" },
-    { email: "b", username: "b", password: "b" },
-    { username: "password", password: "password" }, // Most obvious credential
-    { username: "cool", password: "cool" },
-];
+
 
 export default function LoginPage() {
     const [emailOrUsername, setEmailOrUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState(false);
     const router = useRouter();
-
+    const { signIn } = useSupabase();
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        const user = USERS.find(
-            (u) => (
-                // Check either email or username
-                (u.email === emailOrUsername || u.username === emailOrUsername) 
-                && u.password === password
-            )
-        );
+        
+        const { user, error } = await signIn(emailOrUsername, password);
+
+        if (error) {
+            setError(true);
+            const form = e.target as HTMLFormElement;
+            form.classList.add('error-shake');
+            
+            // Add error cleanup timeout
+            setTimeout(() => {
+                setError(false);
+                form.classList.remove('error-shake');
+            }, 7000);
+        }
 
         if (user) {
             const form = e.target as HTMLFormElement;
             form.classList.add('success');
             await new Promise(resolve => setTimeout(resolve, 800));
             router.push("/success");
-        } else {
-            setError(true);
-            const form = e.target as HTMLFormElement;
-            form.classList.add('error-shake');
-            
-            setTimeout(() => {
-                setError(false);
-                form.classList.remove('error-shake');
-            }, 7000);
         }
+
+
     };
 
     return (
