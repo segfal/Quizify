@@ -70,6 +70,36 @@ export function Chat({ roomId, socket }: ChatProps) {
         loadMessages();
     }, [roomId, getMessages]);
 
+    // Message handler with better error handling and logging
+    const handleMessage = (data: any) => {
+        console.log('Raw message received:', data);
+        
+        if (!data) {
+            console.log('Received empty message data');
+            return;
+        }
+        
+        try {
+            // Format the message from the socket server format to our local format
+            const formattedMessage = {
+                message_id: Date.now(), // Use timestamp as temporary ID if not provided
+                room_id: parseInt(roomId),
+                user_id: parseInt(data.userId),
+                message_text: data.message,
+                created_at: new Date(data.timestamp).toISOString(),
+                users: {
+                    username: data.username
+                }
+            } as Message;
+
+            console.log('Formatted message:', formattedMessage);
+            setMessages(prev => [...prev, formattedMessage]);
+            scrollToBottom();
+        } catch (error) {
+            console.error('Error handling message:', error);
+        }
+    };
+
     // Listen for real-time updates
     useEffect(() => {
         if (!socket) {
@@ -79,61 +109,9 @@ export function Chat({ roomId, socket }: ChatProps) {
 
         console.log('Setting up socket listeners for room:', roomId);
 
-        // Debug socket connection
-        socket.on('connect', () => {
-            console.log('Socket connected with ID:', socket.id);
-        });
-
-        socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Socket disconnected');
-        });
-
         // Join room
         socket.emit('join_room', roomId);
         console.log('Joined room:', roomId);
-        console.log('Socket connected:', socket.connected);
-
-        // Message handler with better error handling and logging
-        const handleMessage = (data: any) => {
-            console.log('Raw message received:', data);
-            
-            if (!data) {
-                console.log('Received empty message data');
-                return;
-            }
-            
-            try {
-                const messageData = data.message || data;
-                console.log('Processing message data:', messageData);
-
-                // Validate required fields
-                if (!messageData.message_text || !messageData.user_id) {
-                    console.error('Invalid message format:', messageData);
-                    return;
-                }
-
-                const formattedMessage = {
-                    message_id: messageData.message_id,
-                    room_id: parseInt(roomId),
-                    user_id: messageData.user_id,
-                    message_text: messageData.message_text,
-                    created_at: messageData.created_at || new Date().toISOString(),
-                    users: {
-                        username: messageData.users?.username || messageData.username || 'Unknown User'
-                    }
-                } as Message;
-
-                console.log('Formatted message:', formattedMessage);
-                setMessages(prev => [...prev, formattedMessage]);
-                scrollToBottom();
-            } catch (error) {
-                console.error('Error handling message:', error);
-            }
-        };
 
         // Listen for messages
         socket.on('message', handleMessage);
@@ -142,9 +120,6 @@ export function Chat({ roomId, socket }: ChatProps) {
             console.log('Cleaning up socket listeners for room:', roomId);
             socket.emit('leave_room', roomId);
             socket.off('message', handleMessage);
-            socket.off('connect');
-            socket.off('disconnect');
-            socket.off('connect_error');
         };
     }, [socket, roomId]);
 
@@ -185,38 +160,18 @@ export function Chat({ roomId, socket }: ChatProps) {
             const newMessage = await sendMessage(parseInt(roomId), messageText);
             console.log('Message saved to database:', newMessage);
 
-            // Create the message payload
+            // Create the message payload matching the server's expected format
             const messagePayload = {
-                roomId: parseInt(roomId),
-                message: {
-                    message_id: newMessage.message_id,
-                    room_id: parseInt(roomId),
-                    user_id: user.user_id,
-                    message_text: messageText,
-                    created_at: newMessage.created_at,
-                    users: {
-                        username: user.username
-                    }
-                }
+                roomId: roomId.toString(),
+                message: messageText,
+                userId: user.user_id.toString(),
+                username: user.username,
+                timestamp: Date.now()
             };
 
             console.log('Emitting message to socket:', messagePayload);
             // Emit to socket with the correct format
             socket.emit('message', messagePayload);
-
-            // Add message to local state immediately
-            const formattedMessage = {
-                message_id: newMessage.message_id,
-                room_id: parseInt(roomId),
-                user_id: user.user_id,
-                message_text: messageText,
-                created_at: newMessage.created_at,
-                users: {
-                    username: user.username
-                }
-            };
-            setMessages(prev => [...prev, formattedMessage]);
-            scrollToBottom();
 
         } catch (error) {
             console.error('Error sending message:', error);
