@@ -21,7 +21,22 @@ interface FeatureCard {
     icon: string; // Icon for the feature
     borderColor: string; // Border color for the feature
 }
+interface AboutCard {
+    title: string; // Title of the feature
+    description: string; // Description of the feature
+    icon: string; // Icon for the feature
+    borderColor: string; // Border color for the feature
+}
 
+
+const aboutCard: AboutCard[] = [
+    {
+        title: "About",
+        description: "Bringing students together to learn & have fun",
+        icon: "👨‍💻",
+        borderColor: "border-[#ff3366]",
+    }
+]
 // Card data array with consistent styling
 const featureCards: FeatureCard[] = [
     {
@@ -63,6 +78,13 @@ const LandingPage = () => {
             {/* Content */}
             <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
                 <AnimatedTitle />
+                <motion.div
+                    variants={containerAnimation}
+                    initial="hidden"
+                    animate="visible"
+                >
+                  
+                </motion.div>
                 <motion.div 
                     className="max-w-[1200px] w-full grid grid-cols-1 md:grid-cols-3 gap-8"
                     variants={containerAnimation}
