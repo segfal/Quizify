@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { QuizRoom } from '@/components/quiz/QuizRoom';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { supabase } from '@/utils/supabase/client';
+import Whiteboard from '@/components/room/Whiteboard';
 
 interface Message {
     userId: string;
@@ -49,6 +50,7 @@ export default function RoomPage() {
     const [isQuizMinimized, setIsQuizMinimized] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
+    const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
     
     const [notes] = useState<Note[]>([
         // Dummy notes for testing
@@ -199,6 +201,12 @@ export default function RoomPage() {
         }
     };
 
+    const handleWhiteboardToggle = () => {
+        setIsWhiteboardOpen(!isWhiteboardOpen);
+        setSelectedFeature(isWhiteboardOpen ? null : 'whiteboard');
+        console.log(isWhiteboardOpen);
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -291,6 +299,7 @@ export default function RoomPage() {
                             whileHover={{ scale: 1.02 }}
                             onClick={() => {
                                 setSelectedFeature('whiteboard');
+                                setIsWhiteboardOpen(true);
                                 setIsQuizMinimized(false);
                             }}
                             className={`
@@ -371,6 +380,16 @@ export default function RoomPage() {
                             />
                         </div>
                     )}
+
+                    {/* Whiteboard Section */}
+                    {selectedFeature === 'whiteboard' && socket && (
+                        <Whiteboard
+                            isOpen={isWhiteboardOpen}
+                            onToggle={handleWhiteboardToggle}
+                            roomId={roomId}
+                            socket={socket}
+                        />
+                    )}
                 </div>
 
                 {/* Right Side - Chat */}
@@ -378,8 +397,6 @@ export default function RoomPage() {
                     <Chat
                         roomId={roomId}
                         socket={socket}
-                        messages={messages}
-                        onSendMessage={handleSendMessage}
                     />
                 </div>
             </div>
