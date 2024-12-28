@@ -6,125 +6,91 @@ interface UseSocketProps {
     serverUrl?: string;
 }
 
-export const useSocket = ({ serverUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }: UseSocketProps = {}) => {
+export const useSocket = ({ serverUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:5000' }: UseSocketProps = {}) => {
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
-        // Initialize socket connection
-        socketRef.current = io(serverUrl, {
-            path: '/api/socket',
-            addTrailingSlash: false,
-        });
+        if (socketRef.current?.connected) return;
 
-        // Connection event handlers
-        socketRef.current.on('connect', () => {
-            console.log('Connected to Socket.IO server');
-        });
+        const connectSocket = async () => {
+            try {
+                console.log('Connecting to socket server:', serverUrl);
+                // Initialize socket connection
+                const socket = io(serverUrl, {
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                    transports: ['websocket'],
+                });
 
-        socketRef.current.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-            toast.error('Failed to connect to room server');
-        });
+                socket.on('connect', () => {
+                    console.log('Connected to Socket.IO server with ID:', socket.id);
+                    toast.success('Connected to chat server');
+                });
+
+                socket.on('connect_error', (error) => {
+                    console.error('Socket connection error:', error);
+                    toast.error('Failed to connect to chat server');
+                });
+
+                socket.on('disconnect', (reason) => {
+                    console.log('Disconnected from socket server:', reason);
+                    if (reason === 'io server disconnect') {
+                        // the disconnection was initiated by the server, reconnect manually
+                        socket.connect();
+                    }
+                    toast.error('Disconnected from chat server');
+                });
+
+                // Assign the socket to the ref
+                socketRef.current = socket;
+                console.log('Socket assigned to ref:', socketRef.current.id);
+
+            } catch (error) {
+                console.error('Failed to initialize socket:', error);
+                toast.error('Failed to initialize chat server');
+            }
+        };
+
+        connectSocket();
 
         // Cleanup on unmount
         return () => {
-            if (socketRef.current) {
+            if (socketRef.current?.connected) {
                 socketRef.current.disconnect();
+                socketRef.current = null;
             }
         };
     }, [serverUrl]);
 
-    // Room creation
-    const createRoom = useCallback((roomName: string) => {
-        return new Promise((resolve, reject) => {
-            if (!socketRef.current) {
-                reject(new Error('Socket not connected'));
-                return;
-            }
-
-            socketRef.current.emit('create_room', { name: roomName });
-            socketRef.current.once('room_created', (data) => {
-                resolve(data);
-            });
-        });
-    }, []);
-
-    // Join room
+    // Room joining with retry logic
     const joinRoom = useCallback((roomId: string) => {
-        return new Promise((resolve, reject) => {
-            if (!socketRef.current) {
-                reject(new Error('Socket not connected'));
-                return;
-            }
+        console.log('Joining room:', roomId);
+        if (!socketRef.current?.connected) {
+            console.error('Socket not connected');
+            toast.error('Chat server not connected');
+            return;
+        }
 
-            socketRef.current.emit('join_room', roomId);
-            socketRef.current.once('user_joined', (data) => {
-                resolve(data);
-            });
-        });
+        console.log('Joining room:', roomId);
+        socketRef.current.emit('join_room', roomId);
     }, []);
 
     // Leave room
     const leaveRoom = useCallback((roomId: string) => {
-        return new Promise((resolve, reject) => {
-            if (!socketRef.current) {
-                reject(new Error('Socket not connected'));
-                return;
-            }
-
-            socketRef.current.emit('leave_room', roomId);
-            socketRef.current.once('user_left', (data) => {
-                resolve(data);
-            });
-        });
-    }, []);
-
-    // Get active rooms
-    const getRooms = useCallback(() => {
-        return new Promise((resolve, reject) => {
-            if (!socketRef.current) {
-                reject(new Error('Socket not connected'));
-                return;
-            }
-
-            socketRef.current.emit('get_rooms');
-            socketRef.current.once('rooms_list', (rooms) => {
-                resolve(rooms);
-            });
-        });
-    }, []);
-
-    // Subscribe to room events
-    const subscribeToRoom = useCallback((roomId: string, events: {
-        onUserJoined?: (data: any) => void;
-        onUserLeft?: (data: any) => void;
-    }) => {
-        if (!socketRef.current) return;
-
-        if (events.onUserJoined) {
-            socketRef.current.on('user_joined', events.onUserJoined);
-        }
-        if (events.onUserLeft) {
-            socketRef.current.on('user_left', events.onUserLeft);
+        if (!socketRef.current?.connected) {
+            console.error('Socket not connected');
+            return;
         }
 
-        return () => {
-            if (!socketRef.current) return;
-            if (events.onUserJoined) {
-                socketRef.current.off('user_joined', events.onUserJoined);
-            }
-            if (events.onUserLeft) {
-                socketRef.current.off('user_left', events.onUserLeft);
-            }
-        };
+        console.log('Leaving room:', roomId);
+        socketRef.current.emit('leave_room', roomId);
     }, []);
 
     return {
         socket: socketRef.current,
-        createRoom,
         joinRoom,
         leaveRoom,
-        getRooms,
-        subscribeToRoom,
+        isConnected: socketRef.current?.connected || false,
     };
 }; 

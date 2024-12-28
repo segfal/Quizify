@@ -1,41 +1,52 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-
+import { useSupabase } from '@/contexts/SupabaseContext';
 
 export default function RoomPage() {
     const router = useRouter();
     const [roomName, setRoomName] = useState('');
+    const [subject, setSubject] = useState('');
     const [isCreating, setIsCreating] = useState(false);
-    const [rooms] = useState([
-        // Dummy rooms for testing
-        { id: '1', name: 'Math Study Room', subject: 'Mathematics', participants: 3 },
-        { id: '2', name: 'Physics Lab', subject: 'Physics', participants: 2 },
-        { id: '3', name: 'Chemistry Group', subject: 'Chemistry', participants: 5 },
-    ]);
+    const [rooms, setRooms] = useState<any[]>([]);
+    const { createRoom, getRooms, user } = useSupabase();
+
+    useEffect(() => {
+        loadRooms();
+    }, []);
+
+    const loadRooms = async () => {
+        try {
+            const roomsList = await getRooms();
+            setRooms(roomsList);
+        } catch (error) {
+            toast.error('Failed to load rooms');
+        }
+    };
 
     const handleCreateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!roomName.trim()) {
-            toast.error('Please enter a room name');
+        if (!roomName.trim() || !subject.trim()) {
+            toast.error('Please enter both room name and subject');
             return;
         }
 
         setIsCreating(true);
         try {
-            // For now, we'll just redirect to a test room
-            const roomId = '1'; // In real app, this would be generated
-            router.push(`/dashboard/room/${roomId}`); // Redirect to the room
+            const room = await createRoom(roomName, subject);
+            toast.success('Room created successfully!');
+            router.push(`/dashboard/room/${room.room_id}`);
         } catch (error) {
             toast.error('Failed to create room');
+        } finally {
             setIsCreating(false);
         }
     };
 
-    const handleJoinRoom = (roomId: string) => {
+    const handleJoinRoom = (roomId: number) => {
         router.push(`/dashboard/room/${roomId}`);
     };
 
@@ -51,6 +62,15 @@ export default function RoomPage() {
                             onChange={(e) => setRoomName(e.target.value)}
                             placeholder="Enter room name..."
                             className="flex-1 px-4 py-2 bg-gray-900 rounded-lg border border-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            required
+                        />
+                        <input
+                            type="text"
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            placeholder="Enter subject..."
+                            className="flex-1 px-4 py-2 bg-gray-900 rounded-lg border border-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            required
                         />
                         <motion.button
                             whileTap={{ scale: 0.95 }}
@@ -77,7 +97,7 @@ export default function RoomPage() {
                     ) : (
                         rooms.map((room) => (
                             <motion.div
-                                key={room.id}
+                                key={room.room_id}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 whileHover={{ scale: 1.02 }}
@@ -85,15 +105,18 @@ export default function RoomPage() {
                             >
                                 <div className="flex justify-between items-center">
                                     <div>
-                                        <h3 className="text-xl font-semibold mb-2">{room.name}</h3>
+                                        <h3 className="text-xl font-semibold mb-2">{room.room_name}</h3>
                                         <p className="text-gray-400">{room.subject}</p>
                                         <p className="text-sm text-gray-500 mt-2">
-                                            {room.participants} participants
+                                            {room.members} participants
+                                        </p>
+                                        <p className="text-xs text-gray-600 mt-1">
+                                            Room Code: {room.room_code}
                                         </p>
                                     </div>
                                     <motion.button
                                         whileTap={{ scale: 0.95 }}
-                                        onClick={() => handleJoinRoom(room.id)}
+                                        onClick={() => handleJoinRoom(room.room_id)}
                                         className="px-6 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
                                     >
                                         Join Room

@@ -7,6 +7,8 @@ import { Chat } from '@/components/room/Chat';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { QuizRoom } from '@/components/quiz/QuizRoom';
+import { useSupabase } from '@/contexts/SupabaseContext';
+import { supabase } from '@/utils/supabase/client';
 
 interface Message {
     userId: string;
@@ -23,17 +25,31 @@ interface Note {
     uploadedAt: string;
 }
 
+interface RoomData {
+    room_id: number;
+    room_name: string;
+    subject: string;
+    members: number;
+    room_code: string;
+    created: string;
+    user_id: number;
+    last_active: string;
+}
+
 export default function RoomPage() {
     const router = useRouter();
     const params = useParams();
-    const roomId = params.roomId as string;
+    const roomId = params?.roomId as string;
+    const { user } = useSupabase();
     
     const { socket, joinRoom, leaveRoom } = useSocket();
-    const [roomData, setRoomData] = useState<any>(null);
+    const [roomData, setRoomData] = useState<RoomData | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [selectedFeature, setSelectedFeature] = useState<'whiteboard' | 'quiz' | null>(null);
     const [isQuizMinimized, setIsQuizMinimized] = useState(false);
-
+    const [isLoading, setIsLoading] = useState(true);
+    const [copySuccess, setCopySuccess] = useState(false);
+    
     const [notes] = useState<Note[]>([
         // Dummy notes for testing
         { 
@@ -65,6 +81,39 @@ export default function RoomPage() {
             uploadedAt: '2024-02-17'
         }
     ]);
+
+    // Fetch room data
+    useEffect(() => {
+        const fetchRoomData = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('room')
+                    .select('*')
+                    .eq('room_id', roomId)
+                    .single();
+
+                if (error) throw error;
+                if (!data) {
+                    toast.error('Room not found');
+                    router.push('/dashboard/room');
+                    return;
+                }
+
+                setRoomData(data);
+                document.title = `${data.room_name} - Quizify`;
+            } catch (error) {
+                console.error('Error fetching room:', error);
+                toast.error('Failed to load room data');
+                router.push('/dashboard/room');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (roomId) {
+            fetchRoomData();
+        }
+    }, [roomId, router]);
 
     useEffect(() => {
         if (socket && roomId) {
@@ -138,15 +187,80 @@ export default function RoomPage() {
         setIsQuizMinimized(!isQuizMinimized);
     };
 
-    if (!roomId) {
-        return <div>Invalid room ID</div>;
+    const handleCopyRoomCode = async () => {
+        if (!roomData) return;
+        try {
+            await navigator.clipboard.writeText(roomData.room_code);
+            setCopySuccess(true);
+            toast.success('Room code copied to clipboard!');
+            setTimeout(() => setCopySuccess(false), 2000);
+        } catch (err) {
+            toast.error('Failed to copy room code');
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="text-xl">Loading room...</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!roomData) {
+        return (
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
+                <div className="text-xl">Room not found</div>
+            </div>
+        );
     }
 
     return (
         <div className="min-h-screen bg-black text-white">
             {/* Room Header */}
             <div className="flex justify-between items-center p-4 border-b border-gray-800">
-                <h1 className="text-2xl font-bold">{roomData?.name || 'Math Room'}</h1>
+                <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold">{roomData.room_name}</h1>
+                        <span className="px-2 py-1 bg-purple-500/20 text-purple-300 text-sm rounded">
+                            {roomData.subject}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-2 text-gray-400 text-sm">
+                            <span>Room Code:</span>
+                            <code className="px-2 py-1 bg-gray-800 rounded font-mono">
+                                {roomData.room_code}
+                            </code>
+                            <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handleCopyRoomCode}
+                                className={`px-2 py-1 rounded text-xs transition-colors ${
+                                    copySuccess 
+                                        ? 'bg-green-500/20 text-green-300'
+                                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                                }`}
+                            >
+                                {copySuccess ? 'Copied!' : 'Copy'}
+                            </motion.button>
+                        </div>
+                        <span className="text-gray-400 text-sm">•</span>
+                        <span className="text-gray-400 text-sm">
+                            {roomData.members} participant{roomData.members !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-gray-400 text-sm">•</span>
+                        <span className="text-gray-400 text-sm">
+                            Created {new Date(roomData.created).toLocaleDateString()}
+                        </span>
+                        <span className="text-gray-400 text-sm">•</span>
+                        <span className="text-gray-400 text-sm">
+                            Last active {new Date(roomData.last_active).toLocaleTimeString()}
+                        </span>
+                    </div>
+                </div>
                 <div className="flex items-center gap-4">
                     {selectedFeature === 'quiz' && isQuizMinimized && (
                         <motion.button
