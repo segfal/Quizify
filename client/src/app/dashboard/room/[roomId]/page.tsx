@@ -38,17 +38,6 @@ interface RoomData {
     last_active: string;
 }
 
-export async function generateStaticParams() {
-    // This is a placeholder that generates a few static paths
-    // You might want to fetch actual room IDs from your database
-    return [
-        { roomId: '1' },
-        { roomId: '2' },
-        { roomId: '3' },
-        // Add more room IDs as needed
-    ]
-}
-
 export default function RoomPage() {
     const router = useRouter();
     const params = useParams();
