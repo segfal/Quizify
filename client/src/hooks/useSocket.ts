@@ -6,7 +6,8 @@ interface UseSocketProps {
     serverUrl?: string;
 }
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5003';
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+console.log(SOCKET_SERVER_URL);
 
 export const useSocket = ({ serverUrl = SOCKET_SERVER_URL }: UseSocketProps = {}) => {
     const socketRef = useRef<Socket | null>(null);
