@@ -1,15 +1,18 @@
 "use client";
+
 import { useState } from "react";
-import { motion } from "framer-motion";
+import dynamic from 'next/dynamic';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import AnimatedBackground from "@/components/ui/AnimatedBackground";
-import { AnimatedLoginError } from "@/components/ui/AnimatedLoginError";
 import { useRouter } from "next/navigation";
-import { AnimatedErrorBackground } from "@/components/ui/AnimatedErrorBackground";
 import { useSupabase } from "@/contexts/SupabaseContext";
 
-
+// Dynamically import components that use browser APIs
+const AnimatedBackground = dynamic(() => import("@/components/ui/AnimatedBackground"), { ssr: false });
+const AnimatedLoginError = dynamic(() => import("@/components/ui/AnimatedLoginError"), { ssr: false });
+const AnimatedErrorBackground = dynamic(() => import("@/components/ui/AnimatedErrorBackground"), { ssr: false });
+const MotionDiv = dynamic(() => import("framer-motion").then((mod) => mod.motion.div), { ssr: false });
+const MotionForm = dynamic(() => import("framer-motion").then((mod) => mod.motion.form), { ssr: false });
 
 export default function LoginPage() {
     const [emailOrUsername, setEmailOrUsername] = useState("");
@@ -17,6 +20,7 @@ export default function LoginPage() {
     const [error, setError] = useState(false);
     const router = useRouter();
     const { signIn } = useSupabase();
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         
@@ -27,7 +31,6 @@ export default function LoginPage() {
             const form = e.target as HTMLFormElement;
             form.classList.add('error-shake');
             
-            // Add error cleanup timeout
             setTimeout(() => {
                 setError(false);
                 form.classList.remove('error-shake');
@@ -40,8 +43,6 @@ export default function LoginPage() {
             await new Promise(resolve => setTimeout(resolve, 800));
             router.push("/success");
         }
-
-
     };
 
     return (
@@ -49,12 +50,12 @@ export default function LoginPage() {
             <AnimatedBackground />
             <AnimatedErrorBackground isVisible={error} />
             
-            <motion.div
+            <MotionDiv
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="relative z-10"
             >
-                <motion.form
+                <MotionForm
                     onSubmit={handleLogin}
                     className={`
                         bg-black/50 backdrop-blur-lg p-8 rounded-2xl 
@@ -116,8 +117,8 @@ export default function LoginPage() {
                             </div>
                         </div>
                     </div>
-                </motion.form>
-            </motion.div>
+                </MotionForm>
+            </MotionDiv>
         </div>
     );
 } 

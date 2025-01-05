@@ -7,15 +7,27 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true
+}));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        origin: process.env.CLIENT_URL || "http://localhost:3000",
         methods: ["GET", "POST"],
         credentials: true
-    }
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000
+});
+
+// Basic health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
 });
 
 io.on('connection', (socket) => {
@@ -39,16 +51,21 @@ io.on('connection', (socket) => {
             console.error('Invalid message format:', data);
             return;
         }
-        io.to(data.roomId).emit('message', data);
+        io.to(data.roomId).emit('message', data.message);
     });
 
     socket.on('disconnect', () => {
         console.log('Socket disconnected:', socket.id);
     });
+
+    // Error handling
+    socket.on('error', (error) => {
+        console.error('Socket error:', error);
+    });
 });
 
-const PORT = process.env.PORT;
-console.log(PORT);
+const PORT = process.env.PORT || 5003;
+
 httpServer.listen(PORT, () => {
     console.log(`Socket.IO server is running on port ${PORT}`);
 }); 

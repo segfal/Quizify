@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -22,6 +23,7 @@ interface Player {
     name: string;
     score: number;
     streak: number;
+    lastAnswer?: number; // Optional property for the player's last answer
 }
 
 interface QuizRoomProps {
@@ -35,7 +37,7 @@ interface Achievement {
   id: string;
   name: string;
   description: string;
-  icon: JSX.Element;
+  icon: React.ReactElement;
   unlocked: boolean;
 }
 
@@ -43,11 +45,21 @@ interface PowerUp {
   id: string;
   name: string;
   description: string;
-  icon: JSX.Element;
+  icon: React.ReactElement;
   available: boolean;
 }
 
-const ANSWER_COLORS = {
+interface AnswerColor {
+    bg: string;
+    hover: string;
+    pattern: string;
+}
+
+interface AnswerColors {
+    [key: number]: AnswerColor;
+}
+
+const ANSWER_COLORS: AnswerColors = {
     0: { bg: 'bg-red-500', hover: 'hover:bg-red-600', pattern: '🔺' },
     1: { bg: 'bg-blue-500', hover: 'hover:bg-blue-600', pattern: '⬜' },
     2: { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-600', pattern: '⭐' },
@@ -363,7 +375,7 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
                 // Get stats for this question
                 const totalAnswers = players.length;
                 const correctAnswers = players.filter(p => 
-                    p.lastAnswer === question.correctAnswer
+                    p.lastAnswer !== undefined && p.lastAnswer === question.correctAnswer
                 ).length;
                 setCorrectAnswerStats({
                     total: totalAnswers,

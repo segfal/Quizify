@@ -29,9 +29,12 @@ const USER_STORAGE_KEY = 'quizify_user'
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<DBUser | null>(() => {
-    // Check localStorage on initial load
-    const storedUser = localStorage.getItem(USER_STORAGE_KEY)
-    return storedUser ? JSON.parse(storedUser) : null
+    // Check if we're in the browser before accessing localStorage
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem(USER_STORAGE_KEY)
+      return storedUser ? JSON.parse(storedUser) : null
+    }
+    return null
   })
   const [rooms, setRooms] = useState<DBRoom[]>([])
   const [loading, setLoading] = useState(false)
@@ -52,15 +55,19 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         return { user: null, error: userError }
       }
 
-      // Store user in state and localStorage
+      // Store user in state and localStorage (only in browser)
       setUser(userData)
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData))
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData))
+      }
       return { user: userData, error: null }
     },
     signOut: async () => {
-      // Clear user from state and localStorage
+      // Clear user from state and localStorage (only in browser)
       setUser(null)
-      localStorage.removeItem(USER_STORAGE_KEY)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(USER_STORAGE_KEY)
+      }
     },
     signUp: async (email: string, password: string) => {
       const { error } = await supabase.auth.signUp({
