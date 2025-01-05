@@ -213,7 +213,7 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
     } | null>(null);
     const [isStarting, setIsStarting] = useState(false);
     const [isActive, setIsActive] = useState(false);
-    const [question, setQuestion] = useState<Question | null>(null);
+    const [question, setQuestion] = useState<QuizQuestion | null>(null);
 
     useEffect(() => {
         if (socket) {
@@ -348,14 +348,78 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
         }
     };
 
-    const handleAnswer = (answer: number) => {
-        if (!socket || !question) return;
+    const handleAnswer = (answerIndex: number) => {
+        const question = getCurrentQuestion();
+        if (!socket || !question || selectedAnswer !== null) return;
         
-        socket.emit('submit_answer', {
-            roomId,
-            questionId: question.id,
-            answer
-        });
+        setSelectedAnswer(answerIndex);
+        
+        // Check if answer is correct
+        const isCorrect = answerIndex === question.correctAnswer;
+        
+        if (isCorrect) {
+            // Calculate points based on time left
+            const points = calculatePoints(timeLeft, multiplier);
+            
+            // Show correct animation
+            setShowCorrectAnimation(true);
+            setTimeout(() => setShowCorrectAnimation(false), 1000);
+            
+            // Update streak and multiplier
+            const newStreak = streak + 1;
+            setStreak(newStreak);
+            setMultiplier(Math.min(4, 1 + Math.floor(newStreak / 3)));
+            
+            // Emit answer with points
+            socket.emit('quiz_answer', {
+                roomId,
+                questionId: question.id,
+                answer: answerIndex,
+                timeLeft,
+                points,
+                multiplier: activePowerUp === 'double_points' ? multiplier * 2 : multiplier
+            });
+        } else {
+            // Show wrong animation
+            setShowWrongAnimation(true);
+            setTimeout(() => setShowWrongAnimation(false), 1000);
+            
+            // Reset streak and multiplier
+            setStreak(0);
+            setMultiplier(1);
+
+            // Emit answer with 0 points
+            socket.emit('quiz_answer', {
+                roomId,
+                questionId: question.id,
+                answer: answerIndex,
+                timeLeft,
+                points: 0,
+                multiplier: 1
+            });
+        }
+
+        // Show correct answer after a delay
+        setTimeout(() => {
+            setShowAnswer(true);
+            // Get stats for this question
+            const totalAnswers = players.length;
+            const correctAnswers = players.filter(p => 
+                p.lastAnswer !== undefined && p.lastAnswer === question.correctAnswer
+            ).length;
+            setCorrectAnswerStats({
+                total: totalAnswers,
+                correct: correctAnswers,
+                percentage: (correctAnswers / totalAnswers) * 100
+            });
+        }, 1000);
+
+        // Move to next question after showing answer
+        setTimeout(() => {
+            setShowAnswer(false);
+            setCorrectAnswerStats(null);
+            handleNextQuestion();
+        }, 3000);
     };
 
     const unlockAchievement = (achievementId: string) => {
