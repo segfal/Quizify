@@ -211,6 +211,9 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
         correct: number;
         percentage: number;
     } | null>(null);
+    const [isStarting, setIsStarting] = useState(false);
+    const [isActive, setIsActive] = useState(false);
+    const [question, setQuestion] = useState<Question | null>(null);
 
     useEffect(() => {
         if (socket) {
@@ -227,10 +230,24 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
                 setPlayers(updatedPlayers);
             });
 
+            socket.on('achievement_unlocked', (achievement: Achievement) => {
+                setAchievements(prev => [...prev, achievement]);
+                setRecentAchievement(achievement);
+                setTimeout(() => setRecentAchievement(null), 5000);
+            });
+
+            socket.on('powerup_received', (powerUp: PowerUp) => {
+                setPowerUps(prev => [...prev, powerUp]);
+                setActivePowerUp(powerUp.id);
+                setTimeout(() => setActivePowerUp(null), 5000);
+            });
+
             return () => {
                 socket.off('player_joined');
                 socket.off('quiz_message');
                 socket.off('score_update');
+                socket.off('achievement_unlocked');
+                socket.off('powerup_received');
             };
         }
     }, [socket]);
@@ -274,26 +291,48 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
         return null;
     };
 
-    const startGame = () => {
-        // Play countdown sound
-        new Audio('/sounds/countdown.mp3').play().catch(() => {});
+    const startQuiz = () => {
+        if (!socket) return;
         
-        // Start countdown animation
+        setIsStarting(true);
         setCountdown(3);
+        
+        let count = 3;
         const countdownInterval = setInterval(() => {
-            setCountdown(prev => {
-                if (prev === 1) {
-                    clearInterval(countdownInterval);
-                    setGameState('playing');
-                    setCurrentQuestion(0);
-                    setTimeLeft(dummyQuestions[0].timeLimit);
-                    socket.emit('start_game', { roomId });
-                    return null;
-                }
-                return prev ? prev - 1 : null;
-            });
+            count -= 1;
+            if (count <= 0) {
+                clearInterval(countdownInterval);
+                setCountdown(null);
+                setIsStarting(false);
+                setIsActive(true);
+                setGameState('playing');
+                setTimeLeft(dummyQuestions[0].timeLimit);
+                socket.emit('start_quiz', { roomId });
+            } else {
+                setCountdown(count);
+            }
         }, 1000);
     };
+
+    useEffect(() => {
+        if (isActive && socket) {
+            const question = dummyQuestions[currentQuestion];
+            if (!question) return;
+
+            const interval = setInterval(() => {
+                setTimeLeft(prev => {
+                    if (prev <= 1) {
+                        clearInterval(interval);
+                        handleNextQuestion();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+
+            return () => clearInterval(interval);
+        }
+    }, [isActive, currentQuestion, socket]);
 
     const handleNextQuestion = () => {
         if (currentQuestion < dummyQuestions.length - 1) {
@@ -301,99 +340,22 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
             setCurrentQuestion(nextQuestion);
             setTimeLeft(dummyQuestions[nextQuestion].timeLimit);
             setSelectedAnswer(null);
+            setShowAnswer(false);
+            setCorrectAnswerStats(null);
         } else {
             setGameState('results');
+            setIsActive(false);
         }
     };
 
-    const handleAnswer = (answerIndex: number) => {
-        const question = getCurrentQuestion();
-        if (selectedAnswer === null && question) {
-            setSelectedAnswer(answerIndex);
-            
-            // Check if answer is correct
-            const isCorrect = answerIndex === question.correctAnswer;
-            
-            if (isCorrect) {
-                // Calculate points based on time left
-                const points = calculatePoints(timeLeft, multiplier);
-                
-                // Play success sound with pitch based on streak
-                const audio = new Audio('/sounds/correct.mp3');
-                audio.playbackRate = 1 + (streak * 0.1);
-                audio.play().catch(() => {});
-                
-                // Show correct animation
-                setShowCorrectAnimation(true);
-                setTimeout(() => setShowCorrectAnimation(false), 1000);
-                
-                // Update streak and multiplier
-                const newStreak = streak + 1;
-                setStreak(newStreak);
-                setMultiplier(Math.min(4, 1 + Math.floor(newStreak / 3)));
-                
-                // Check for achievements
-                if (newStreak === 1) unlockAchievement('first_correct');
-                if (newStreak === 3) unlockAchievement('streak_3');
-                if (timeLeft > question.timeLimit * 0.75) unlockAchievement('speed_demon');
-
-                // Emit answer with points
-                socket.emit('quiz_answer', {
-                    roomId,
-                    questionId: question.id,
-                    answer: answerIndex,
-                    timeLeft,
-                    points,
-                    multiplier: activePowerUp === 'double_points' ? multiplier * 2 : multiplier
-                });
-            } else {
-                // Play wrong sound
-                new Audio('/sounds/wrong.mp3').play().catch(() => {});
-                
-                // Show wrong animation
-                setShowWrongAnimation(true);
-                setTimeout(() => setShowWrongAnimation(false), 1000);
-                
-                // Reset streak and multiplier
-                setStreak(0);
-                setMultiplier(1);
-
-                // Emit answer with 0 points
-                socket.emit('quiz_answer', {
-                    roomId,
-                    questionId: question.id,
-                    answer: answerIndex,
-                    timeLeft,
-                    points: 0,
-                    multiplier: 1
-                });
-            }
-
-            // Show correct answer after a delay
-            setTimeout(() => {
-                setShowAnswer(true);
-                // Get stats for this question
-                const totalAnswers = players.length;
-                const correctAnswers = players.filter(p => 
-                    p.lastAnswer !== undefined && p.lastAnswer === question.correctAnswer
-                ).length;
-                setCorrectAnswerStats({
-                    total: totalAnswers,
-                    correct: correctAnswers,
-                    percentage: (correctAnswers / totalAnswers) * 100
-                });
-            }, 1000);
-
-            // Move to next question after showing answer
-            setTimeout(() => {
-                setShowAnswer(false);
-                setCorrectAnswerStats(null);
-                handleNextQuestion();
-            }, 3000);
-
-            // Reset active power-up
-            setActivePowerUp(null);
-        }
+    const handleAnswer = (answer: number) => {
+        if (!socket || !question) return;
+        
+        socket.emit('submit_answer', {
+            roomId,
+            questionId: question.id,
+            answer
+        });
     };
 
     const unlockAchievement = (achievementId: string) => {
@@ -602,7 +564,7 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={startGame}
+                            onClick={startQuiz}
                             className="px-8 py-4 bg-purple-500 hover:bg-purple-600 rounded-xl text-xl font-bold text-white shadow-lg"
                         >
                             Start Game
