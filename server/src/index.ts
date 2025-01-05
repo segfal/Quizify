@@ -8,7 +8,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true
 }));
@@ -16,7 +16,7 @@ app.use(cors({
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
+        origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
         methods: ["GET", "POST"],
         credentials: true
     },

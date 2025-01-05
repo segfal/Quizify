@@ -37,6 +37,7 @@
     "three": "^0.171.0"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.9.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
