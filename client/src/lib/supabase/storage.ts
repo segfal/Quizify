@@ -6,7 +6,7 @@ export const uploadPdf = async (file: File, userId: string) => {
     try {
         const filename = `${userId}/${Date.now()}-${file.name}`;
         const { data, error } = await supabase.storage
-            .from('pdfs')
+            .from('pdfstore')
             .upload(filename, file);
 
         if (error) throw error;
@@ -20,7 +20,7 @@ export const uploadPdf = async (file: File, userId: string) => {
 export const getPdfUrl = async (path: string) => {
     try {
         const { data } = await supabase.storage
-            .from('pdfs')
+            .from('pdfstore')
             .getPublicUrl(path);
         
         return data.publicUrl;
@@ -33,7 +33,7 @@ export const getPdfUrl = async (path: string) => {
 export const deletePdf = async (path: string) => {
     try {
         const { error } = await supabase.storage
-            .from('pdfs')
+            .from('pdfstore')
             .remove([path]);
 
         if (error) throw error;

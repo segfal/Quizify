@@ -10,6 +10,7 @@ import { QuizRoom } from '@/components/quiz/QuizRoom';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { supabase } from '@/utils/supabase/client';
 import Whiteboard from '@/components/room/Whiteboard';
+import { PdfUpload } from '@/components/pdf/PdfUpload';
 
 interface Message {
     userId: string;
@@ -51,6 +52,9 @@ export default function RoomPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
     const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isPdfUploadVisible, setIsPdfUploadVisible] = useState(false);
+
     
     const [notes] = useState<Note[]>([
         // Dummy notes for testing
@@ -336,11 +340,21 @@ export default function RoomPage() {
                                 <motion.button
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
+                                    onClick={() => setIsPdfUploadVisible(!isPdfUploadVisible)}
                                     className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
                                 >
-                                    Upload File
+                                    {isPdfUploadVisible ? 'Close Upload' : 'Upload File'}
                                 </motion.button>
                             </div>
+                            {isPdfUploadVisible && (
+                                <PdfUpload
+                                    userId={String(user?.user_id || '')}
+                                    onUploadSuccess={(url: string) => {
+                                        toast.success('File uploaded successfully!');
+                                        setIsPdfUploadVisible(false);
+                                    }}
+                                />
+                            )}
                             <div className="space-y-3">
                                 {notes.map((note) => (
                                     <motion.div
