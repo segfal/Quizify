@@ -6,13 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useSupabase } from "@/contexts/SupabaseContext";
+import { motion } from "framer-motion";
 
 // Dynamically import components that use browser APIs
-const AnimatedBackground = dynamic(() => import("@/components/ui/AnimatedBackground"), { ssr: false });
-const AnimatedLoginError = dynamic(() => import("@/components/ui/AnimatedLoginError"), { ssr: false });
-const AnimatedErrorBackground = dynamic(() => import("@/components/ui/AnimatedErrorBackground"), { ssr: false });
-const MotionDiv = dynamic(() => import("framer-motion").then((mod) => mod.motion.div), { ssr: false });
-const MotionForm = dynamic(() => import("framer-motion").then((mod) => mod.motion.form), { ssr: false });
+const AnimatedBackground = dynamic(() => import("@/components/ui/AnimatedBackground"), {
+    ssr: false,
+    loading: () => <div className="fixed inset-0 -z-10 bg-black" />
+});
+
+const AnimatedLoginError = dynamic(() => import("@/components/ui/AnimatedLoginError").then(mod => ({ default: mod.AnimatedLoginError })), {
+    ssr: false
+});
+
+const AnimatedErrorBackground = dynamic(() => import("@/components/ui/AnimatedErrorBackground").then(mod => ({ default: mod.AnimatedErrorBackground })), {
+    ssr: false
+});
 
 export default function LoginPage() {
     const [emailOrUsername, setEmailOrUsername] = useState("");
@@ -50,12 +58,12 @@ export default function LoginPage() {
             <AnimatedBackground />
             <AnimatedErrorBackground isVisible={error} />
             
-            <MotionDiv
+            <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="relative z-10"
             >
-                <MotionForm
+                <motion.form
                     onSubmit={handleLogin}
                     className={`
                         bg-black/50 backdrop-blur-lg p-8 rounded-2xl 
@@ -117,8 +125,8 @@ export default function LoginPage() {
                             </div>
                         </div>
                     </div>
-                </MotionForm>
-            </MotionDiv>
+                </motion.form>
+            </motion.div>
         </div>
     );
 } 
