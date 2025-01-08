@@ -20,13 +20,7 @@ const Dashboard = () => {
     const router = useRouter();
 
     const dashboardButtons = [
-        {
-            title: 'Upload Files',
-            icon: '📄',
-            onClick: () => router.push('/dashboard/upload'),
-            bgColor: 'bg-blue-500',
-            hoverColor: 'hover:bg-blue-600'
-        },
+  
         {
             title: 'Join Room',
             icon: '🚪',
@@ -35,12 +29,13 @@ const Dashboard = () => {
             hoverColor: 'hover:bg-purple-600'
         },
         {
-            title: 'Open Whiteboard',
-            icon: '✏️',
-            onClick: () => router.push('/dashboard/whiteboard'),
-            bgColor: 'bg-green-500',
+            title: 'Create Room',
+            icon: '🚪',
+            onClick: () => router.push('/dashboard/room'),
+            bgColor: 'bg-purple-500',
             hoverColor: 'hover:bg-green-600'
         },
+      
     ];
 
     return (

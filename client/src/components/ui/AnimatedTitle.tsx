@@ -16,7 +16,7 @@ const AnimatedTitle = () => {
         <motion.div
             initial="hidden"
             animate="visible"
-            className="mb-16 text-center"
+            className="mb-24 text-center scale-150"
         >
             <motion.h1 
                 className="text-6xl font-bold bg-gradient-to-r from-[#ff3366] via-[#8855ff] to-[#3366ff] text-transparent bg-clip-text"
@@ -24,11 +24,11 @@ const AnimatedTitle = () => {
                 {title.split("").map((char, index) => (
                     <motion.span
                         key={index}
-                        variants={letterAnimation}
+                        variants={letterAnimation} 
                         transition={{
-                            duration: 0.5,
-                            delay: index * 0.1,
-                            ease: [0.2, 0.65, 0.3, 0.9],
+                            duration: 0.25, // 0.25 seconds for each letter
+                            delay: index * 0.05, // 0.05 seconds delay between letters
+                            ease: [0.2, 0.65, 0.3, 0.9], // Easing function for smooth animation
                         }}
                         className="inline-block"
                     >

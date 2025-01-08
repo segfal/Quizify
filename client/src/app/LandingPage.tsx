@@ -69,11 +69,18 @@ const containerAnimation = {
     },
 };
 
+/**
+ * 
+ * @returns Add a login button that is under the animated title with a background animation button
+ */
+
+
+
 const LandingPage = () => {
     return (
         <div className="relative min-h-screen">
             <AnimatedBackground />
-            <LoginButton />
+            {/* <LoginButton /> */}
             
             {/* Content */}
             <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
@@ -83,22 +90,9 @@ const LandingPage = () => {
                     initial="hidden"
                     animate="visible"
                 >
-                  
+                   <LoginButton />
                 </motion.div>
-                <motion.div 
-                    className="max-w-[1200px] w-full grid grid-cols-1 md:grid-cols-3 gap-8"
-                    variants={containerAnimation}
-                    initial="hidden"
-                    animate="visible"
-                >
-                    {featureCards.map((card, index) => (
-                        <FeatureCard
-                            key={card.title}
-                            {...card}
-                            index={index}
-                        />
-                    ))}
-                </motion.div>
+            
             </div>
         </div>
     );

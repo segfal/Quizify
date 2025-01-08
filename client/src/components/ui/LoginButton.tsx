@@ -5,12 +5,23 @@ import { motion } from "framer-motion";
 
 export const LoginButton = () => {
     const router = useRouter();
-
+    // center of the screen
     return (
         <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute top-4 right-4 z-20"
+            initial={{ opacity: 0, y: 20, scale: 1 }}
+            animate={{ 
+                opacity: 1, 
+                y: 0,
+                scale: 2,
+                transition: {
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 20
+                }
+            }}
+            whileHover={{ scale: 2.5 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex justify-center mt-8 z-20"
         >
             <Button 
                 onClick={() => router.push('/login')}
