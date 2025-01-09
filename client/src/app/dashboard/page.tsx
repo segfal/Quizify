@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import DashboardButton from '@/components/dashboard/DashboardButton';
 import { LogoutButton } from '@/components/auth/LogoutButton';
+import CreateRoom from '@/components/room/CreateRoom';
+import JoinRoom from '@/components/room/JoinRoom';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -67,6 +69,11 @@ const Dashboard = () => {
                         />
                     ))}
                 </motion.div>
+
+                <div className="flex flex-col md:flex-row justify-center gap-6 mt-8">
+                    <CreateRoom />
+                    <JoinRoom />
+                </div>
 
                 <div className="text-center">
                     <LogoutButton />
