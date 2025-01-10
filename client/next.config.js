@@ -11,6 +11,14 @@ const nextConfig = {
     // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
+  images: {
+    unoptimized: true,
+  },
+  output: 'standalone',
+  experimental: {
+    // This will allow better handling of client components
+    serverActions: true,
+  },
 }
 
 module.exports = nextConfig 

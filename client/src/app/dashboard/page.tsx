@@ -2,10 +2,21 @@
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import DashboardButton from '@/components/dashboard/DashboardButton';
+import dynamic from 'next/dynamic';
 import { LogoutButton } from '@/components/auth/LogoutButton';
-import CreateRoom from '@/components/room/CreateRoom';
-import JoinRoom from '@/components/room/JoinRoom';
+
+// Dynamically import components that might use browser APIs
+const DashboardButton = dynamic(() => import('@/components/dashboard/DashboardButton'), {
+    ssr: false
+});
+
+const CreateRoom = dynamic(() => import('@/components/room/CreateRoom'), {
+    ssr: false
+});
+
+const JoinRoom = dynamic(() => import('@/components/room/JoinRoom'), {
+    ssr: false
+});
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -18,11 +29,10 @@ const containerVariants = {
     },
 };
 
-const Dashboard = () => {
+export default function Dashboard() {
     const router = useRouter();
 
     const dashboardButtons = [
-  
         {
             title: 'Join Room',
             icon: '🚪',
@@ -37,7 +47,6 @@ const Dashboard = () => {
             bgColor: 'bg-purple-500',
             hoverColor: 'hover:bg-green-600'
         },
-      
     ];
 
     return (
@@ -81,6 +90,4 @@ const Dashboard = () => {
             </motion.div>
         </div>
     );
-};
-
-export default Dashboard; 
+} 
