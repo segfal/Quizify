@@ -3,13 +3,7 @@
 import { motion } from 'framer-motion';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import { useRouter } from 'next/navigation';
-
-interface PageLayoutProps {
-    title: string;
-    description: string;
-    icon: string;
-    children?: React.ReactNode;
-}
+import { PageLayoutProps } from '@/interfaces/layout/types';
 
 export default function PageLayout({ title, description, icon, children }: PageLayoutProps) {
     const router = useRouter();

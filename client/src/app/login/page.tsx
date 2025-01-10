@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useSupabase } from "@/contexts/SupabaseContext";
 import { motion } from "framer-motion";
+import { useDispatch } from "react-redux";
+import { setUser } from "@/store/slices/userSlice";
 
 // Dynamically import components that use browser APIs
 const AnimatedBackground = dynamic(() => import("@/components/ui/AnimatedBackground"), {
@@ -28,6 +30,7 @@ export default function LoginPage() {
     const [error, setError] = useState(false);
     const router = useRouter();
     const { signIn } = useSupabase();
+    const dispatch = useDispatch();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,6 +49,14 @@ export default function LoginPage() {
         }
 
         if (user) {
+            // Dispatch user data to Redux
+            dispatch(setUser({
+                id: user.user_id,
+                username: user.username,
+                email: user.email,
+                role: user.role || 'student'
+            }));
+
             const form = e.target as HTMLFormElement;
             form.classList.add('success');
             await new Promise(resolve => setTimeout(resolve, 800));

@@ -20,48 +20,11 @@ import { Socket } from 'socket.io-client';
 import { Chat } from './Chat';
 import { supabase } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+import { useSocket } from '@/contexts/SocketContext';
+import { Point, Shape, Text, Line, WhiteboardProps, Tool } from '@/interfaces/whiteboard/types';
 
-type Tool = 'draw' | 'erase' | 'square' | 'circle' | 'text' | 'select';
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Shape {
-  type: 'square' | 'circle';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  id: string;
-}
-
-interface Text {
-  x: number;
-  y: number;
-  content: string;
-  color: string;
-  fontSize: number;
-  id: string;
-}
-
-interface Line {
-  points: Point[];
-  color: string;
-  width: number;
-  id: string;
-}
-
-interface WhiteboardProps {
-  isOpen: boolean;
-  onToggle: () => void;
-  roomId: string;
-  socket: Socket;
-}
-
-export default function Whiteboard({ isOpen, onToggle, roomId, socket }: WhiteboardProps) {
+export default function Whiteboard({ isOpen, onToggle, roomId }: WhiteboardProps) {
+  const { socket, isConnected } = useSocket();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentLine, setCurrentLine] = useState<Line | null>(null);
@@ -76,6 +39,22 @@ export default function Whiteboard({ isOpen, onToggle, roomId, socket }: Whitebo
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState<Point | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      console.log('Socket not ready');
+      return;
+    }
+
+    console.log('Setting up whiteboard socket listeners for room:', roomId);
+    socket.emit('join_room', roomId);
+
+    return () => {
+      if (socket && isConnected) {
+        socket.emit('leave_room', roomId);
+      }
+    };
+  }, [socket, isConnected, roomId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -234,7 +213,7 @@ export default function Whiteboard({ isOpen, onToggle, roomId, socket }: Whitebo
       }
 
       // Emit the point to other users
-      socket.emit('draw_line', {
+      handleSendDrawing({
         roomId,
         line: {
           ...newLine,
@@ -248,7 +227,7 @@ export default function Whiteboard({ isOpen, onToggle, roomId, socket }: Whitebo
     if (currentLine) {
       setLines(prev => [...prev, currentLine]);
       // Emit the final line to all users
-      socket.emit('draw_line', {
+      handleSendDrawing({
         roomId,
         line: currentLine
       });
@@ -397,7 +376,7 @@ export default function Whiteboard({ isOpen, onToggle, roomId, socket }: Whitebo
     setTextPosition(null);
 
     // Emit text added event
-    socket.emit('add_text', {
+    handleSendDrawing({
       roomId,
       text: newText
     });
@@ -513,10 +492,18 @@ export default function Whiteboard({ isOpen, onToggle, roomId, socket }: Whitebo
   const handleDarkModeToggle = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
-    socket.emit('dark_mode_changed', {
+    handleSendDrawing({
       roomId,
       isDarkMode: newMode
     });
+  };
+
+  const handleSendDrawing = (drawingData: any) => {
+    if (!socket || !isConnected) {
+      toast.error('Connection not available');
+      return;
+    }
+    socket.emit('drawing', { roomId, ...drawingData });
   };
 
   if (!isOpen) {

@@ -2,14 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-interface FeatureCardProps {
-    title: string;
-    description: string;
-    icon: string;
-    borderColor: string;
-    index: number;
-}
+import { FeatureCardProps } from "@/interfaces/ui/types";
 
 const cardAnimationVariants = {
     hidden: { 

@@ -193,8 +193,6 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
     const [timeLeft, setTimeLeft] = useState<number>(0);
     const [players, setPlayers] = useState<Player[]>([]);
     const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-    const [messages, setMessages] = useState<{ user: string; message: string }[]>([]);
-    const [newMessage, setNewMessage] = useState('');
     const [showScoreboard, setShowScoreboard] = useState(false);
     const [achievements, setAchievements] = useState<Achievement[]>(ACHIEVEMENTS);
     const [powerUps, setPowerUps] = useState<PowerUp[]>(POWER_UPS);
@@ -222,10 +220,6 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
                 toast.success(`${player.name} joined the game!`);
             });
 
-            socket.on('quiz_message', (message: { user: string; message: string }) => {
-                setMessages(prev => [...prev, message]);
-            });
-
             socket.on('score_update', (updatedPlayers: Player[]) => {
                 setPlayers(updatedPlayers);
             });
@@ -244,7 +238,6 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
 
             return () => {
                 socket.off('player_joined');
-                socket.off('quiz_message');
                 socket.off('score_update');
                 socket.off('achievement_unlocked');
                 socket.off('powerup_received');
@@ -463,20 +456,6 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
             }
             return newPowerUps;
         });
-    };
-
-    const sendMessage = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newMessage.trim() && socket) {
-            socket.emit('quiz_message', {
-                roomId,
-                message: {
-                    user: 'Player',
-                    message: newMessage.trim()
-                }
-            });
-            setNewMessage('');
-        }
     };
 
     const toggleScoreboard = () => {
@@ -871,47 +850,6 @@ export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps)
                         </div>
                     </motion.div>
                 )}
-            </div>
-
-            {/* Quiz Chat */}
-            <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col">
-                <div className="p-4 border-b border-gray-800">
-                    <h3 className="text-lg font-semibold text-white">Quiz Chat</h3>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    <AnimatePresence initial={false}>
-                        {messages.map((msg, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0 }}
-                                className="break-words"
-                            >
-                                <span className="font-semibold text-purple-400">{msg.user}:</span>
-                                <p className="text-white/90">{msg.message}</p>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
-                <form onSubmit={sendMessage} className="p-4 border-t border-gray-800">
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Type a message..."
-                            className="flex-1 px-4 py-2 bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                        <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            type="submit"
-                            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg"
-                        >
-                            Send
-                        </motion.button>
-                    </div>
-                </form>
             </div>
         </div>
     );

@@ -66,6 +66,9 @@ export type Database = {
           user_id: number
           message_text: string
           created_at: string
+          users?: {
+            username: string
+          }
         }
         Insert: {
           message_id?: number

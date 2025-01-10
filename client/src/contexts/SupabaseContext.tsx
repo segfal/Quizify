@@ -19,7 +19,7 @@ type SupabaseContextType = {
   joinRoom: (roomCode: string) => Promise<DBRoom>
   getRooms: () => Promise<DBRoom[]>
   sendMessage: (roomId: number, message: string) => Promise<DBChat>
-  getMessages: (roomId: number, limit?: number) => Promise<DBChat[]>
+  getMessages: (roomId: number, limit?: number, beforeTimestamp?: string) => Promise<DBChat[]>
 }
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
@@ -187,8 +187,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       }
       return data;
     },
-    getMessages: async (roomId: number, limit = 50) => {
-      const { data, error } = await supabase
+    getMessages: async (roomId: number, limit = 50, beforeTimestamp?: string) => {
+      const query = supabase
         .from('chat')
         .select(`
           message_id,
@@ -203,6 +203,13 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         .eq('room_id', roomId)
         .order('created_at', { ascending: true })
         .limit(limit);
+
+      // Add timestamp filter if provided
+      if (beforeTimestamp) {
+        query.lt('created_at', beforeTimestamp);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error getting messages:', error);

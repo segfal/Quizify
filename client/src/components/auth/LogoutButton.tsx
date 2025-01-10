@@ -2,13 +2,23 @@
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { useDispatch } from 'react-redux';
+import { clearUser } from '@/store/slices/userSlice';
+import { useSupabase } from '@/contexts/SupabaseContext';
 
 export const LogoutButton = () => {
     const router = useRouter();
+    const dispatch = useDispatch();
+    const { signOut } = useSupabase();
 
-    const handleLogout = () => {
-        // Simply redirect to home page since we're using dummy data
-        router.push('/');
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            dispatch(clearUser());
+            router.push('/');
+        } catch (error) {
+            console.error('Error logging out:', error);
+        }
     };
 
     return (

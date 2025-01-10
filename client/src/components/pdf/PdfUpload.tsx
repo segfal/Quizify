@@ -6,11 +6,7 @@ import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/utils/supabase/client';
 import type { DragEvent } from 'react';
-
-interface PdfUploadProps {
-    userId: string;
-    onUploadSuccess: (url: string) => void;
-}
+import type { PdfUploadProps } from '@/interfaces/pdf/types';
 
 export function PdfUpload({ userId, onUploadSuccess }: PdfUploadProps) {
     const onDrop = useCallback(async (acceptedFiles: File[]) => {

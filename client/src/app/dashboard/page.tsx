@@ -3,7 +3,11 @@
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { LogoutButton } from '@/components/auth/LogoutButton';
+import { UserInfo } from '@/components/ui/UserInfo';
+import { RootState } from '@/store/store';
 
 // Dynamically import components that might use browser APIs
 const DashboardButton = dynamic(() => import('@/components/dashboard/DashboardButton'), {
@@ -29,65 +33,42 @@ const containerVariants = {
     },
 };
 
-export default function Dashboard() {
+export default function DashboardPage() {
     const router = useRouter();
+    const user = useSelector((state: RootState) => state.user);
 
-    const dashboardButtons = [
-        {
-            title: 'Join Room',
-            icon: '🚪',
-            onClick: () => router.push('/dashboard/room'),
-            bgColor: 'bg-purple-500',
-            hoverColor: 'hover:bg-purple-600'
-        },
-        {
-            title: 'Create Room',
-            icon: '🚪',
-            onClick: () => router.push('/dashboard/room'),
-            bgColor: 'bg-purple-500',
-            hoverColor: 'hover:bg-green-600'
-        },
-    ];
+    useEffect(() => {
+        if (!user.isAuthenticated) {
+            router.push('/login');
+        }
+    }, [user.isAuthenticated, router]);
+
+    // Don't render anything while checking authentication
+    if (!user.isAuthenticated) {
+        return null;
+    }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="container mx-auto px-4 py-8"
-            >
-                <motion.h1
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-4xl font-bold text-center mb-12"
-                >
-                    Welcome to Your Dashboard
-                </motion.h1>
+        <div className="min-h-screen bg-gray-950 text-white p-8">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold">Dashboard</h1>
+                    <div className="flex items-center gap-4">
+                        <UserInfo />
+                        <LogoutButton />
+                    </div>
+                </div>
 
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
-                    className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-8"
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                 >
-                    {dashboardButtons.map((button) => (
-                        <DashboardButton
-                            key={button.title}
-                            {...button}
-                        />
-                    ))}
-                </motion.div>
-
-                <div className="flex flex-col md:flex-row justify-center gap-6 mt-8">
                     <CreateRoom />
                     <JoinRoom />
-                </div>
-
-                <div className="text-center">
-                    <LogoutButton />
-                </div>
-            </motion.div>
+                </motion.div>
+            </div>
         </div>
     );
 } 
