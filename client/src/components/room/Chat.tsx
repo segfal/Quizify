@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { Socket } from 'socket.io-client';
+import moment from 'moment';
 
 interface ChatProps {
     roomId: string;
@@ -74,27 +75,31 @@ export function Chat({ roomId, socket }: ChatProps) {
     const handleMessage = (data: any) => {
         console.log('Raw message received:', data);
         
-        if (!data) {
-            console.log('Received empty message data');
+        if (!data || !data.message || !data.userId || !data.username) {
+            console.log('Received incomplete message data:', data);
             return;
         }
-        
+
         try {
-            // Format the message from the socket server format to our local format
             const formattedMessage = {
-                message_id: Date.now(), // Use timestamp as temporary ID if not provided
+                message_id: Date.now(),
                 room_id: parseInt(roomId),
                 user_id: parseInt(data.userId),
                 message_text: data.message,
-                created_at: new Date(data.timestamp).toISOString(),
+                created_at: moment().format('YYYY-MM-DD HH:mm:ss'),
                 users: {
-                    username: data.username
+                    username: data.username || 'Unknown User'
                 }
             } as Message;
 
+            // Validate the message before adding it
+            if (!formattedMessage.message_text || !formattedMessage.users.username) {
+                console.error('Invalid message format:', formattedMessage);
+                return;
+            }
+
             console.log('Formatted message:', formattedMessage);
             setMessages(prev => [...prev, formattedMessage]);
-            scrollToBottom();
         } catch (error) {
             console.error('Error handling message:', error);
         }
@@ -155,27 +160,43 @@ export function Chat({ roomId, socket }: ChatProps) {
         setMessage(''); // Clear input immediately for better UX
 
         try {
-            console.log('Sending message to database...');
+            // Create the message object first
+            const now = moment().format('YYYY-MM-DD HH:mm:ss');
+            const newMessageObj = {
+                message_id: Date.now(),
+                room_id: parseInt(roomId),
+                user_id: user.user_id,
+                message_text: messageText,
+                created_at: now,
+                users: {
+                    username: user.username
+                }
+            } as Message;
+
+            // Add message to UI immediately
+            setMessages(prev => [...prev, newMessageObj]);
+
             // Send to database
+            console.log('Sending message to database...');
             const newMessage = await sendMessage(parseInt(roomId), messageText);
             console.log('Message saved to database:', newMessage);
 
-            // Create the message payload matching the server's expected format
+            // Create the message payload for socket
             const messagePayload = {
                 roomId: roomId.toString(),
                 message: messageText,
                 userId: user.user_id.toString(),
-                username: user.username,
-                timestamp: Date.now()
+                username: user.username
             };
 
             console.log('Emitting message to socket:', messagePayload);
-            // Emit to socket with the correct format
             socket.emit('message', messagePayload);
 
         } catch (error) {
             console.error('Error sending message:', error);
             setMessage(messageText); // Restore message if send fails
+            // Optionally remove the message from UI if sending failed
+            setMessages(prev => prev.slice(0, -1));
         }
     };
 
