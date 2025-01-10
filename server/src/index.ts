@@ -7,8 +7,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
+const allowedOrigins = [
+    process.env.NEXT_PUBLIC_SITE_URL || "https://quizifi.netlify.app",
+    "http://localhost:3000"
+];
+
 app.use(cors({
-    origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ["GET", "POST"],
     credentials: true
 }));
@@ -16,11 +27,11 @@ app.use(cors({
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
         credentials: true
     },
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     pingTimeout: 60000,
     pingInterval: 25000
 });
