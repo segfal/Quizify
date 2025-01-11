@@ -8,63 +8,14 @@ import {
   Trophy, Star, Zap, Timer, Award, 
   Shield, Flame, Bolt, Gift, Crown
 } from 'lucide-react';
+import { useSocket } from '@/contexts/SocketContext';
+import { useUser } from '@/contexts/UserContext';
+import { QuizQuestion, Player, QuizRoomProps, Achievement, PowerUp, AnswerColors } from '@/interfaces/quiz/types';
+import { dummyQuestions } from '@/components/dummydata/QuizQuestions';
+import { ANSWER_COLORS } from '@/components/dummydata/QuizColors';
+import { ACHIEVEMENTS } from '@/components/dummydata/QuizAchievements';
+import { POWER_UPS } from '@/components/dummydata/QuizPowerups';
 
-interface QuizQuestion {
-    id: number;
-    question: string;
-    answers: string[];
-    correctAnswer: number;
-    timeLimit: number;
-    points: number; // Base points for the question
-}
-
-interface Player {
-    id: string;
-    name: string;
-    score: number;
-    streak: number;
-    lastAnswer?: number; // Optional property for the player's last answer
-}
-
-interface QuizRoomProps {
-    socket: any;
-    roomId: string;
-    onClose: () => void;
-    onMinimize: () => void;
-}
-
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactElement;
-  unlocked: boolean;
-}
-
-interface PowerUp {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactElement;
-  available: boolean;
-}
-
-interface AnswerColor {
-    bg: string;
-    hover: string;
-    pattern: string;
-}
-
-interface AnswerColors {
-    [key: number]: AnswerColor;
-}
-
-const ANSWER_COLORS: AnswerColors = {
-    0: { bg: 'bg-red-500', hover: 'hover:bg-red-600', pattern: '🔺' },
-    1: { bg: 'bg-blue-500', hover: 'hover:bg-blue-600', pattern: '⬜' },
-    2: { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-600', pattern: '⭐' },
-    3: { bg: 'bg-green-500', hover: 'hover:bg-green-600', pattern: '●' }
-};
 
 const calculatePoints = (timeLeft: number, multiplier: number) => {
     const basePoints = 1000;
@@ -72,120 +23,9 @@ const calculatePoints = (timeLeft: number, multiplier: number) => {
     return (basePoints + timeBonus) * multiplier;
 };
 
-const dummyQuestions: QuizQuestion[] = [
-    {
-        id: 1,
-        question: "Which method is used to add an element to the end of a list in Python?",
-        answers: [".append()", ".add()", ".insert()", ".push()"],
-        correctAnswer: 0,
-        timeLimit: 20, // Increased time limit for more Kahoot-like feel
-        points: 1000
-    },
-    {
-        id: 2,
-        question: "How do you remove the last element from a list in Python?",
-        answers: [".pop()", ".remove()", ".delete()", ".splice()"],
-        correctAnswer: 0,
-        timeLimit: 20,
-        points: 1000
-    },
-    {
-        id: 3,
-        question: "What is the correct way to create an empty list in Python?",
-        answers: ["list()", "[]", "new List()", "{}"],
-        correctAnswer: 1,
-        timeLimit: 20,
-        points: 1000
-    },
-    {
-        id: 4,
-        question: "Which method is used to sort a list in ascending order?",
-        answers: [".sort()", ".order()", ".arrange()", ".organize()"],
-        correctAnswer: 0,
-        timeLimit: 20,
-        points: 1000
-    },
-    {
-        id: 5,
-        question: "How do you find the length of a list in Python?",
-        answers: ["len(list)", "list.length", "list.size()", "count(list)"],
-        correctAnswer: 0,
-        timeLimit: 20,
-        points: 1000
-    },
-    {
-        id: 6,
-        question: "Which method is used to remove a specific item from a list?",
-        answers: [".remove()", ".delete()", ".pop()", ".splice()"],
-        correctAnswer: 0,
-        timeLimit: 20,
-        points: 1000
-    },
-    {
-        id: 7,
-        question: "How do you reverse a list in Python?",
-        answers: ["list.reverse()", "reverse(list)", "list[::-1]", "Both A and C"],
-        correctAnswer: 3,
-        timeLimit: 20,
-        points: 1000
-    },
-    {
-        id: 8,
-        question: "Which method is used to find the index of an item in a list?",
-        answers: [".index()", ".find()", ".search()", ".locate()"],
-        correctAnswer: 0,
-        timeLimit: 20,
-        points: 1000
-    }
-];
 
-const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'first_correct',
-    name: 'First Blood',
-    description: 'Get your first correct answer',
-    icon: <Trophy className="w-6 h-6 text-yellow-400" />,
-    unlocked: false
-  },
-  {
-    id: 'streak_3',
-    name: 'On Fire',
-    description: 'Get a streak of 3 correct answers',
-    icon: <Flame className="w-6 h-6 text-orange-400" />,
-    unlocked: false
-  },
-  {
-    id: 'speed_demon',
-    name: 'Speed Demon',
-    description: 'Answer correctly in under 2 seconds',
-    icon: <Bolt className="w-6 h-6 text-blue-400" />,
-    unlocked: false
-  }
-];
 
-const POWER_UPS: PowerUp[] = [
-  {
-    id: 'time_freeze',
-    name: 'Time Freeze',
-    description: 'Freeze the timer for 5 seconds',
-    icon: <Timer className="w-6 h-6 text-blue-400" />,
-    available: true
-  },
-  {
-    id: '50_50',
-    name: '50/50',
-    description: 'Remove two wrong answers',
-    icon: <Shield className="w-6 h-6 text-purple-400" />,
-    available: true
-  },
-  {
-    id: 'double_points',
-    name: 'Double Points',
-    description: 'Double points for the next question',
-    icon: <Star className="w-6 h-6 text-yellow-400" />,
-    available: true
-  }
-];
+
 
 export const QuizRoom = ({ socket, roomId, onClose, onMinimize }: QuizRoomProps) => {
     const [gameState, setGameState] = useState<'waiting' | 'playing' | 'results'>('waiting');

@@ -47,29 +47,48 @@ io.on('connection', (socket) => {
     socket.on('join_room', (roomId: string) => {
         socket.join(roomId);
         console.log(`User ${socket.id} joined room ${roomId}`);
-        socket.to(roomId).emit('user_joined', { userId: socket.id });
+        // Notify room of new user
+        io.to(roomId).emit('user_joined', { userId: socket.id });
     });
 
     socket.on('leave_room', (roomId: string) => {
         socket.leave(roomId);
         console.log(`User ${socket.id} left room ${roomId}`);
-        socket.to(roomId).emit('user_left', { userId: socket.id });
+        // Notify room of user leaving
+        io.to(roomId).emit('user_left', { userId: socket.id });
     });
 
-    socket.on('message', (data: { roomId: string; message: any }) => {
-        console.log('Message received:', data);
-        if (!data || !data.roomId || !data.message) {
-            console.error('Invalid message format:', data);
-            return;
+    socket.on('message', (data: any) => {
+        console.log('Message received on server:', data);
+        
+        try {
+            const { roomId, message, userId, username } = data;
+            
+            if (!roomId || !message || !userId || !username) {
+                console.error('Invalid message data:', data);
+                return;
+            }
+
+            const messageData = {
+                message,
+                userId,
+                username,
+                timestamp: new Date().toISOString()
+            };
+
+            // Broadcast to ALL clients in the room INCLUDING sender
+            io.in(roomId).emit('message', messageData);
+            console.log('Message broadcast to room:', roomId, messageData);
+            
+        } catch (error) {
+            console.error('Error processing message:', error);
         }
-        io.to(data.roomId).emit('message', data.message);
     });
 
     socket.on('disconnect', () => {
         console.log('Socket disconnected:', socket.id);
     });
 
-    // Error handling
     socket.on('error', (error) => {
         console.error('Socket error:', error);
     });
