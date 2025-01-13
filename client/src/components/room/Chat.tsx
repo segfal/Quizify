@@ -20,6 +20,7 @@ export function Chat({ roomId }: ChatProps) {
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const processedMessageIds = useRef<Set<string>>(new Set());
     const { sendMessage: sendMessageToDb, getMessages } = useSupabase();
     const { socket, isConnected } = useSocket();
     const { userId, username } = useUser();
@@ -127,6 +128,20 @@ export function Chat({ roomId }: ChatProps) {
         const onMessage = (messageData: string | ChatMessage) => {
             console.log('Message received:', messageData);
             
+            // Generate a unique message ID
+            const messageId = typeof messageData === 'string' 
+                ? `${Date.now()}-${Math.random()}`
+                : `${messageData.timestamp}-${messageData.userId}`;
+
+            // Check if we've already processed this message
+            if (processedMessageIds.current.has(messageId)) {
+                console.log('Duplicate message detected, skipping:', messageId);
+                return;
+            }
+
+            // Add message ID to processed set
+            processedMessageIds.current.add(messageId);
+            
             // If messageData is just a string (the message text)
             if (typeof messageData === 'string') {
                 const newMessage: ChatMessage = {
@@ -155,6 +170,7 @@ export function Chat({ roomId }: ChatProps) {
             console.log('Cleaning up socket listeners');
             socket.emit('leave_room', roomId);
             socket.off('message');
+            processedMessageIds.current.clear();
         };
     }, [socket, isConnected, roomId, userId, username]);
 
@@ -188,11 +204,14 @@ export function Chat({ roomId }: ChatProps) {
                 timestamp: new Date().toISOString()
             };
 
-            // Send message via socket first
+            // Send message via socket first for immediate feedback
             socket.emit('message', messagePayload);
 
-            // Save to database
-            await sendMessageToDb(parseInt(roomId), messageText);
+            // Save to database in the background
+            await sendMessageToDb(parseInt(roomId), messageText).catch(error => {
+                console.error('Error saving message to database:', error);
+                // Don't show error to user since message was sent via socket
+            });
 
         } catch (error) {
             console.error('Error sending message:', error);
@@ -202,7 +221,7 @@ export function Chat({ roomId }: ChatProps) {
     };
 
     return (
-        <div className="bg-gray-900 border-l border-gray-800 w-[350px] h-[calc(100vh-80px)] fixed right-0 top-20 flex flex-col">
+        <div className="bg-gray-900 border-l border-gray-800 w-[350px] h-[calc(100vh-250px)] fixed right-0 top-[250px] flex flex-col">
             {/* Chat Header */}
             <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/75">
                 <h2 className="text-lg font-semibold">Chat</h2>

@@ -9,12 +9,17 @@ dotenv.config();
 const app = express();
 const allowedOrigins = [
     process.env.NEXT_PUBLIC_SITE_URL || "https://quizifi.netlify.app",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "https://*.netlify.app"
 ];
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.some(allowed => 
+            allowed.includes('*') 
+                ? origin?.startsWith(allowed.replace('*', '')) 
+                : allowed === origin
+        )) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -31,9 +36,10 @@ const io = new Server(httpServer, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
+    path: '/socket.io'
 });
 
 // Basic health check endpoint

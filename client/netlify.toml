@@ -16,5 +16,17 @@
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/socket.io/*"
+  to = "https://your-socket-server.com/socket.io/:splat"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify"}
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+
 [functions]
   node_bundler = "esbuild" 

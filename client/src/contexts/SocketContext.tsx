@@ -23,12 +23,14 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
         // Create socket connection
         const socket = io(socketUrl, {
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'],
             autoConnect: true,
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
-            timeout: 20000
+            timeout: 20000,
+            path: '/socket.io',
+            forceNew: true
         });
 
         socket.on('connect', () => {
@@ -40,7 +42,15 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         socket.on('connect_error', (error) => {
             console.error('Socket connection error:', error);
             setIsConnected(false);
-            toast.error('Failed to connect to chat server');
+            
+            // Try to reconnect with polling if websocket fails
+            if (socket.io.opts.transports.includes('websocket')) {
+                console.log('Falling back to polling transport');
+                socket.io.opts.transports = ['polling'];
+                socket.connect();
+            } else {
+                toast.error('Failed to connect to chat server');
+            }
         });
 
         socket.on('disconnect', (reason) => {
