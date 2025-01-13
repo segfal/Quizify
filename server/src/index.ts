@@ -4,6 +4,27 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
+// Types
+interface Player {
+    id: string;
+    name: string;
+    score: number;
+    streak: number;
+}
+
+interface Answer {
+    answer: number;
+    timeLeft: number;
+    points: number;
+}
+
+interface Room {
+    players: Player[];
+    currentQuestion: number;
+    isActive: boolean;
+    answers: Map<string, Answer>;
+}
+
 dotenv.config();
 
 const app = express();
@@ -43,7 +64,7 @@ const io = new Server(httpServer, {
 });
 
 // Store room states
-const rooms = new Map();
+const rooms = new Map<string, Room>();
 
 // Basic health check endpoint
 app.get('/health', (req, res) => {
@@ -71,7 +92,9 @@ io.on('connection', (socket) => {
 
         // Add player to room
         const room = rooms.get(roomId);
-        const player = {
+        if (!room) return;
+
+        const player: Player = {
             id: socket.id,
             name: playerName,
             score: 0,
@@ -91,7 +114,7 @@ io.on('connection', (socket) => {
         // Remove player from room
         const room = rooms.get(roomId);
         if (room) {
-            room.players = room.players.filter(p => p.id !== socket.id);
+            room.players = room.players.filter((p: Player) => p.id !== socket.id);
             io.to(roomId).emit('player_left', socket.id);
 
             // Clean up empty rooms
@@ -143,7 +166,7 @@ io.on('connection', (socket) => {
         });
 
         // Update player score
-        const player = room.players.find(p => p.id === socket.id);
+        const player = room.players.find((p: Player) => p.id === socket.id);
         if (player) {
             player.score += points * multiplier;
             if (answer === 1) { // Assuming 1 is correct answer for this example
@@ -164,7 +187,7 @@ io.on('connection', (socket) => {
         // If all players have answered, end the question
         if (room.answers.size === room.players.length) {
             const correctAnswers = Array.from(room.answers.values())
-                .filter(a => a.answer === 1) // Assuming 1 is correct answer
+                .filter((a: Answer) => a.answer === 1) // Assuming 1 is correct answer
                 .length;
 
             io.to(roomId).emit('question_ended', {
@@ -209,7 +232,7 @@ io.on('connection', (socket) => {
         if (!room || !room.isActive) return;
 
         // Handle players who didn't answer
-        room.players.forEach(player => {
+        room.players.forEach((player: Player) => {
             if (!room.answers.has(player.id)) {
                 player.streak = 0;
                 room.answers.set(player.id, {
@@ -222,7 +245,7 @@ io.on('connection', (socket) => {
 
         // Trigger question end
         const correctAnswers = Array.from(room.answers.values())
-            .filter(a => a.answer === 1) // Assuming 1 is correct answer
+            .filter((a: Answer) => a.answer === 1) // Assuming 1 is correct answer
             .length;
 
         io.to(roomId).emit('question_ended', {
@@ -262,8 +285,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('Socket disconnected:', socket.id);
         // Remove player from all rooms they were in
-        rooms.forEach((room, roomId) => {
-            const playerIndex = room.players.findIndex(p => p.id === socket.id);
+        rooms.forEach((room: Room, roomId: string) => {
+            const playerIndex = room.players.findIndex((p: Player) => p.id === socket.id);
             if (playerIndex !== -1) {
                 room.players.splice(playerIndex, 1);
                 io.to(roomId).emit('player_left', socket.id);

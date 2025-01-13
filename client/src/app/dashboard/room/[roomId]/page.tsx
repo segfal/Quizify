@@ -203,6 +203,21 @@ export default function RoomPage() {
         }
     }, [roomId, router, authUser.isAuthenticated]);
 
+    useEffect(() => {
+        if (!socket || !roomId || !user) return;
+
+        // Join the room with player name
+        socket.emit('join_room', {
+            roomId,
+            playerName: user.user_metadata?.full_name || 'Anonymous Player'
+        });
+
+        // Cleanup on unmount
+        return () => {
+            socket.emit('leave_room', { roomId });
+        };
+    }, [socket, roomId, user]);
+
     const handleNotesUpdate = async (content: string) => {
         setNotes(content);
         try {
