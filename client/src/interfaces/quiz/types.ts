@@ -87,14 +87,13 @@ export interface QuizGameplayProps {
     question: QuizQuestion | null;
 }
 
-export interface AnswerColors {
-    [key: number]: {
-        bg: string;
-        hover: string;
-        pattern: string;
-    };
-}
+export type AnswerIndex = 0 | 1 | 2 | 3;
 
+export interface AnswerColors extends Record<AnswerIndex, {
+    bg: string;
+    hover: string;
+    pattern: string;
+}> {}
 
 export interface QuizResultsProps {
     players: Player[];
