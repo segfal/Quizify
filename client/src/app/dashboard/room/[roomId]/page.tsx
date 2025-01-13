@@ -209,14 +209,14 @@ export default function RoomPage() {
         // Join the room with player name
         socket.emit('join_room', {
             roomId,
-            playerName: user.user_metadata?.full_name || 'Anonymous Player'
+            playerName: authUser.username || 'Anonymous Player'
         });
 
         // Cleanup on unmount
         return () => {
             socket.emit('leave_room', { roomId });
         };
-    }, [socket, roomId, user]);
+    }, [socket, roomId, user, authUser]);
 
     const handleNotesUpdate = async (content: string) => {
         setNotes(content);
