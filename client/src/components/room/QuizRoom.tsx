@@ -1,3 +1,9 @@
+'use client'
+
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { QuizQuestion, Player, Achievement, PowerUp } from '@/interfaces/quiz/types';
+
 interface QuizRoomProps {
     socket: any;
     roomId: string;
