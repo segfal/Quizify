@@ -10,10 +10,12 @@ import { QuizRoom } from '@/components/quiz/QuizRoom';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { supabase } from '@/utils/supabase/client';
 import Whiteboard from '@/components/room/Whiteboard';
-import { PdfUpload } from '@/components/pdf/PdfUpload';
 import { UserInfo } from '@/components/ui/UserInfo';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
+import { Notes } from '@/components/room/Notes';
+import { Users, Clock, BookOpen, Award, ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 interface Message {
     userId: string;
@@ -41,6 +43,23 @@ interface RoomData {
     last_active: string;
 }
 
+interface RoomMember {
+    user_id: number;
+    room_id: number;
+    user: {
+        username: string;
+    };
+}
+
+interface RoomMemberWithUser {
+    username: string;
+}
+
+type RoomMemberResponse = {
+    data: RoomMember[] | null;
+    error: Error | null;
+};
+
 export default function RoomPage() {
     const router = useRouter();
     const params = useParams();
@@ -53,7 +72,56 @@ export default function RoomPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedFeature, setSelectedFeature] = useState<'whiteboard' | 'quiz' | null>(null);
     const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
-    const [isPdfUploadVisible, setIsPdfUploadVisible] = useState(false);
+    const [notes, setNotes] = useState('');
+    const [activeMembers, setActiveMembers] = useState<string[]>([]);
+    const [roomStats, setRoomStats] = useState({
+        totalQuizzes: 0,
+        averageScore: 0,
+        studyTime: 0
+    });
+    const [currentStatsPage, setCurrentStatsPage] = useState(0);
+    const statsPerPage = 2;
+    const [isPaused, setIsPaused] = useState(false);
+    const SCROLL_SPEED = 30; // Lower number = faster scroll
+    
+    const statsBoxes = [
+        {
+            icon: <Users className="w-5 h-5 text-purple-400" />,
+            title: "Active Members",
+            value: activeMembers.length,
+            subtitle: (
+                <div className="text-sm text-purple-400/70">
+                    {activeMembers.slice(0, 3).join(', ')}
+                    {activeMembers.length > 3 && ` +${activeMembers.length - 3} more`}
+                </div>
+            ),
+            color: "purple"
+        },
+        {
+            icon: <BookOpen className="w-5 h-5 text-blue-400" />,
+            title: "Total Quizzes",
+            value: roomStats.totalQuizzes,
+            subtitle: `Average Score: ${roomStats.averageScore}%`,
+            color: "blue"
+        },
+        {
+            icon: <Clock className="w-5 h-5 text-green-400" />,
+            title: "Study Time",
+            value: `${Math.round(roomStats.studyTime)} hrs`,
+            subtitle: "This week",
+            color: "green"
+        },
+        {
+            icon: <Award className="w-5 h-5 text-yellow-400" />,
+            title: "Achievements",
+            value: "3",
+            subtitle: "View All →",
+            color: "yellow"
+        }
+    ];
+
+    // Duplicate the stats boxes to create a seamless loop
+    const duplicatedStats = [...statsBoxes, ...statsBoxes];
 
     useEffect(() => {
         if (!authUser.isAuthenticated) {
@@ -89,6 +157,38 @@ export default function RoomPage() {
 
                 setRoomData(data);
                 document.title = `${data.room_name} - Quizify`;
+
+                // Fetch room statistics
+                const { data: quizStats } = await supabase
+                    .from('quiz_results')
+                    .select('score')
+                    .eq('room_id', roomIdNum);
+
+                if (quizStats) {
+                    const totalQuizzes = quizStats.length;
+                    const averageScore = quizStats.reduce((acc, curr) => acc + curr.score, 0) / totalQuizzes;
+                    setRoomStats(prev => ({
+                        ...prev,
+                        totalQuizzes,
+                        averageScore: Math.round(averageScore)
+                    }));
+                }
+
+                // Fetch active members
+                const { data: members } = await supabase
+                    .from('room_members')
+                    .select(`
+                        users!inner (
+                            username
+                        )
+                    `)
+                    .eq('room_id', roomIdNum);
+
+                if (members) {
+                    const usernames = members.map(m => (m.users as unknown as RoomMemberWithUser).username);
+                    setActiveMembers(usernames);
+                }
+
             } catch (error) {
                 console.error('Error fetching room:', error);
                 toast.error('Failed to load room data');
@@ -103,6 +203,24 @@ export default function RoomPage() {
         }
     }, [roomId, router, authUser.isAuthenticated]);
 
+    const handleNotesUpdate = async (content: string) => {
+        setNotes(content);
+        try {
+            const { error } = await supabase
+                .from('notes')
+                .upsert({
+                    room_id: parseInt(roomId),
+                    content: content,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error saving notes:', error);
+            toast.error('Failed to save notes');
+        }
+    };
+
     // Don't render anything while checking authentication
     if (!authUser.isAuthenticated) {
         return null;
@@ -110,26 +228,23 @@ export default function RoomPage() {
 
     return (
         <div className="min-h-screen bg-gray-950 text-white">
-            <div className="container mx-auto p-4">
+            <div className="container mx-auto p-4 max-w-[1600px]">
+                {/* Header */}
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold mb-2">
+                        <h1 className="text-3xl font-bold mb-2">
                             {roomData?.room_name || 'Loading...'}
                         </h1>
                         {roomData && (
-                            <p className="text-gray-400">
-                                Room Code: {roomData.room_code}
-                            </p>
+                            <div className="flex items-center gap-4 text-gray-400">
+                                <span>Room Code: {roomData.room_code}</span>
+                                <span>•</span>
+                                <span>Subject: {roomData.subject}</span>
+                            </div>
                         )}
                     </div>
                     <div className="flex items-center gap-4">
                         <UserInfo />
-                        <button
-                            onClick={() => setIsPdfUploadVisible(!isPdfUploadVisible)}
-                            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
-                        >
-                            {isPdfUploadVisible ? 'Close Upload' : 'Upload PDF'}
-                        </button>
                         <button
                             onClick={() => router.push('/dashboard')}
                             className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
@@ -139,18 +254,57 @@ export default function RoomPage() {
                     </div>
                 </div>
 
-                {/* PDF Upload */}
-                {isPdfUploadVisible && user && (
-                    <div className="mb-6">
-                        <PdfUpload
-                            userId={String(user.user_id || '')}
-                            onUploadSuccess={(url: string) => {
-                                toast.success('File uploaded successfully!');
-                                setIsPdfUploadVisible(false);
-                            }}
-                        />
+                {/* Continuous Stats Scroll */}
+                <div className="relative mb-6 overflow-hidden">
+                    <div className="flex items-center">
+                        <div className="flex-1 overflow-hidden">
+                            <motion.div 
+                                className="flex gap-4"
+                                animate={isPaused ? { x: 0 } : {
+                                    x: [`0%`, `-50%`]
+                                }}
+                                transition={isPaused ? {} : {
+                                    duration: SCROLL_SPEED,
+                                    ease: "linear",
+                                    repeat: Infinity,
+                                    repeatType: "loop"
+                                }}
+                            >
+                                {duplicatedStats.map((stat, index) => (
+                                    <div
+                                        key={`${stat.title}-${index}`}
+                                        className={`flex-none w-[calc(25%-1rem)] bg-${stat.color}-500/10 border border-${stat.color}-500/20 rounded-lg p-4`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {stat.icon}
+                                            <h3 className={`text-lg font-semibold text-${stat.color}-400`}>
+                                                {stat.title}
+                                            </h3>
+                                        </div>
+                                        <p className="text-2xl font-bold">{stat.value}</p>
+                                        <div className={`mt-2 text-sm text-${stat.color}-400/70`}>
+                                            {stat.subtitle}
+                                        </div>
+                                    </div>
+                                ))}
+                            </motion.div>
+                        </div>
                     </div>
-                )}
+                    
+                    {/* Pause/Play button */}
+                    <div className="absolute top-1/2 right-2 -translate-y-1/2">
+                        <button
+                            onClick={() => setIsPaused(!isPaused)}
+                            className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-800 transition-colors"
+                        >
+                            {isPaused ? (
+                                <Play className="w-4 h-4" />
+                            ) : (
+                                <Pause className="w-4 h-4" />
+                            )}
+                        </button>
+                    </div>
+                </div>
 
                 {/* Room content */}
                 {isLoading ? (
@@ -158,44 +312,66 @@ export default function RoomPage() {
                         <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex flex-col gap-4">
-                            <div className="flex gap-4">
-                                <button
+                    <div className="grid grid-cols-4 gap-6">
+                        <div className="col-span-3 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <motion.button
                                     onClick={() => {
                                         setSelectedFeature('whiteboard');
                                         setIsWhiteboardOpen(true);
                                     }}
                                     className={`
-                                        flex-1 h-32 rounded-lg p-4 text-xl font-semibold transition-colors
+                                        h-40 rounded-lg p-6 text-xl font-semibold transition-all
                                         ${selectedFeature === 'whiteboard' 
-                                            ? 'bg-green-500 text-white' 
+                                            ? 'bg-green-500 text-white scale-[0.98]' 
                                             : 'bg-green-500/10 border border-green-500/20 hover:bg-green-500/20'}
                                     `}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                 >
-                                    WhiteBoard
-                                </button>
-                                <button
+                                    <h3 className="text-2xl mb-2">WhiteBoard</h3>
+                                    <p className="text-sm font-normal opacity-80">
+                                        Collaborate in real-time with your team members
+                                    </p>
+                                </motion.button>
+
+                                <motion.button
                                     onClick={() => {
                                         setSelectedFeature('quiz');
                                     }}
                                     className={`
-                                        flex-1 h-32 rounded-lg p-4 text-xl font-semibold transition-colors
+                                        h-40 rounded-lg p-6 text-xl font-semibold transition-all
                                         ${selectedFeature === 'quiz' 
-                                            ? 'bg-blue-500 text-white' 
+                                            ? 'bg-blue-500 text-white scale-[0.98]' 
                                             : 'bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20'}
                                     `}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                 >
-                                    Quiz 😈
-                                </button>
+                                    <h3 className="text-2xl mb-2">Quiz Mode 😈</h3>
+                                    <p className="text-sm font-normal opacity-80">
+                                        Test your knowledge and compete with others
+                                    </p>
+                                </motion.button>
                             </div>
 
                             {selectedFeature === 'whiteboard' && (
-                                <Whiteboard 
-                                    roomId={roomId} 
-                                    isOpen={isWhiteboardOpen}
-                                    onToggle={() => setIsWhiteboardOpen(!isWhiteboardOpen)}
-                                />
+                                <div className="relative">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedFeature(null);
+                                            setIsWhiteboardOpen(false);
+                                        }}
+                                        className="absolute top-2 right-2 z-10 p-2 bg-red-500 hover:bg-red-600 rounded-full transition-colors"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                    <Whiteboard 
+                                        roomId={roomId} 
+                                        isOpen={isWhiteboardOpen}
+                                        onToggle={() => setIsWhiteboardOpen(!isWhiteboardOpen)}
+                                    />
+                                </div>
                             )}
 
                             {selectedFeature === 'quiz' && socket && (
@@ -205,14 +381,25 @@ export default function RoomPage() {
                                     onClose={() => setSelectedFeature(null)}
                                 />
                             )}
+
+                            <Notes
+                                roomId={roomId}
+                                initialContent={notes}
+                                onUpdate={handleNotesUpdate}
+                            />
                         </div>
 
-                        {socket && (
-                            <Chat 
-                                roomId={roomId}
-                                socket={socket}
-                            />
-                        )}
+                        {/* Right Sidebar - Chat */}
+                        <div className="space-y-6">
+                            {socket && (
+                                <div className="h-[calc(100vh-8rem)] bg-gray-900/50 rounded-lg border border-gray-800">
+                                    <Chat 
+                                        roomId={roomId}
+                                        socket={socket}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
