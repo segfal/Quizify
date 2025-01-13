@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
 import { QuizQuestion, Player, Achievement, PowerUp, QuizState, QuizRoomProps } from '@/interfaces/quiz/types';
 import { dummyQuestions } from '@/components/dummydata/QuizQuestions';
 import { ACHIEVEMENTS } from '@/components/dummydata/QuizAchievements';
@@ -13,6 +15,7 @@ import { QuizScoreboard } from '@/components/quiz/QuizScoreboard';
 import { QuizResults } from '@/components/quiz/QuizResults';
 
 export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
+    const authUser = useSelector((state: RootState) => state.user);
     const [state, setState] = useState<QuizState>({
         gameState: 'waiting',
         currentQuestion: 0,
@@ -31,11 +34,13 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         correctAnswerStats: null,
         isStarting: false,
         isActive: false,
-        question: null
+        question: null,
+        mode: 'multi' as 'single' | 'multi'
     });
 
     const [achievements, setAchievements] = useState<Achievement[]>(ACHIEVEMENTS);
     const [powerUps, setPowerUps] = useState<PowerUp[]>(POWER_UPS);
+    const [waitingTimeout, setWaitingTimeout] = useState<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!socket) return;
@@ -54,7 +59,7 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         });
 
         // Game state events
-        socket.on('game_started', (data: { question: QuizQuestion }) => {
+        socket.on('game_started', (data: { question: QuizQuestion, mode: 'single' | 'multi' }) => {
             setState(prev => ({
                 ...prev,
                 gameState: 'playing',
@@ -62,7 +67,9 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
                 timeLeft: data.question.timeLimit,
                 selectedAnswer: null,
                 showAnswer: false,
-                correctAnswerStats: null
+                correctAnswerStats: null,
+                mode: data.mode,
+                isActive: true
             }));
         });
 
@@ -116,6 +123,9 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         });
 
         return () => {
+            if (waitingTimeout) {
+                clearTimeout(waitingTimeout);
+            }
             socket.off('player_joined');
             socket.off('player_left');
             socket.off('game_started');
@@ -124,7 +134,7 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             socket.off('game_ended');
             socket.off('answer_received');
         };
-    }, [socket]);
+    }, [socket, waitingTimeout]);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -144,11 +154,63 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         return () => clearInterval(timer);
     }, [state.gameState, state.timeLeft, socket, roomId]);
 
-    const startQuiz = () => {
+    // Add countdown effect
+    useEffect(() => {
+        let countdownTimer: NodeJS.Timeout;
+        
+        if (state.countdown !== null && state.countdown > 0) {
+            countdownTimer = setTimeout(() => {
+                setState(prev => ({
+                    ...prev,
+                    countdown: prev.countdown !== null ? prev.countdown - 1 : null
+                }));
+            }, 1000);
+        } else if (state.countdown === 0) {
+            // When countdown reaches 0, clear it and set game as active
+            setState(prev => ({
+                ...prev,
+                countdown: null,
+                isStarting: false,
+                isActive: true
+            }));
+        }
+
+        return () => {
+            if (countdownTimer) {
+                clearTimeout(countdownTimer);
+            }
+        };
+    }, [state.countdown]);
+
+    const startQuiz = (mode: 'single' | 'multi' = 'multi') => {
         if (!socket) return;
         
-        setState(prev => ({ ...prev, isStarting: true, countdown: 3 }));
-        socket.emit('start_quiz', { roomId });
+        setState(prev => ({ 
+            ...prev, 
+            isStarting: true, 
+            countdown: 3,
+            mode 
+        }));
+
+        // Join room with selected mode
+        socket.emit('join_room', { 
+            roomId, 
+            playerName: authUser.username || 'Anonymous Player',
+            mode 
+        });
+
+        if (mode === 'multi') {
+            // Set a timeout to switch to single player if no one joins
+            const timeout = setTimeout(() => {
+                if (state.players.length <= 1) {
+                    toast.info('No other players joined. Switching to single player mode...');
+                    startQuiz('single');
+                }
+            }, 30000); // Wait 30 seconds for other players
+            setWaitingTimeout(timeout);
+        } else {
+            socket.emit('start_quiz', { roomId });
+        }
     };
 
     const handleAnswer = (answerIndex: number) => {
@@ -239,115 +301,142 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 p-8 overflow-hidden">
-                <AnimatePresence mode="wait">
-                    {state.gameState === 'waiting' && (
-                        <motion.div
-                            key="waiting"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="text-center"
-                        >
-                            <h2 className="text-4xl font-bold text-white mb-8">
-                                Waiting for players...
-                            </h2>
-                            {state.players.length > 0 && (
-                                <div className="mb-8">
-                                    <h3 className="text-2xl font-bold text-white mb-4">
-                                        Players ({state.players.length})
-                                    </h3>
-                                    <div className="flex flex-wrap justify-center gap-4">
-                                        {state.players.map(player => (
-                                            <div
-                                                key={player.id}
-                                                className="px-4 py-2 bg-white/10 rounded-lg text-white"
-                                            >
-                                                {player.name}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {state.players.length >= 2 && !state.isStarting && (
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={startQuiz}
-                                    className="px-8 py-4 bg-green-500 hover:bg-green-600 rounded-xl text-2xl font-bold text-white"
-                                >
-                                    Start Quiz
-                                </motion.button>
-                            )}
-                        </motion.div>
-                    )}
-
-                    {state.gameState === 'playing' && state.question && (
-                        <QuizGameplay
-                            socket={socket}
-                            roomId={roomId}
-                            currentQuestion={state.currentQuestion}
-                            timeLeft={state.timeLeft}
-                            players={state.players}
-                            selectedAnswer={state.selectedAnswer}
-                            showAnswer={state.showAnswer}
-                            correctAnswerStats={state.correctAnswerStats}
-                            streak={state.streak}
-                            multiplier={state.multiplier}
-                            showCorrectAnimation={state.showCorrectAnimation}
-                            showWrongAnimation={state.showWrongAnimation}
-                            activePowerUp={state.activePowerUp}
-                            powerUps={powerUps}
-                            handleAnswer={handleAnswer}
-                            usePowerUp={usePowerUp}
-                            question={state.question}
-                        />
-                    )}
-
-                    {state.gameState === 'results' && (
-                        <QuizResults
-                            players={state.players}
-                            achievements={achievements}
-                        />
-                    )}
-                </AnimatePresence>
-
-                {/* Scoreboard Overlay */}
-                <AnimatePresence>
-                    {state.showScoreboard && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            className="absolute inset-0 flex items-center justify-center bg-black/50"
-                            onClick={toggleScoreboard}
-                        >
-                            <div
-                                className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-auto"
-                                onClick={e => e.stopPropagation()}
+            <div className="flex-1 p-8 overflow-hidden flex">
+                {/* Quiz Area - Takes up most of the space */}
+                <div className="flex-1 mr-4">
+                    <AnimatePresence mode="wait">
+                        {state.gameState === 'waiting' && (
+                            <motion.div
+                                key="waiting"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="text-center"
                             >
-                                <QuizScoreboard players={state.players} />
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                                <h2 className="text-4xl font-bold text-white mb-8">
+                                    Choose Game Mode
+                                </h2>
+                                <div className="flex justify-center gap-8 mb-8">
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => startQuiz('single')}
+                                        className="px-8 py-4 bg-green-500 hover:bg-green-600 rounded-xl text-2xl font-bold text-white"
+                                    >
+                                        Play Solo
+                                    </motion.button>
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => startQuiz('multi')}
+                                        className="px-8 py-4 bg-blue-500 hover:bg-blue-600 rounded-xl text-2xl font-bold text-white"
+                                    >
+                                        Play with Others
+                                    </motion.button>
+                                </div>
+                                {state.mode === 'multi' && state.players.length > 0 && (
+                                    <div className="mb-8">
+                                        <h3 className="text-2xl font-bold text-white mb-4">
+                                            Players ({state.players.length})
+                                        </h3>
+                                        <div className="flex flex-wrap justify-center gap-4">
+                                            {state.players.map(player => (
+                                                <div
+                                                    key={player.id}
+                                                    className="px-4 py-2 bg-white/10 rounded-lg text-white"
+                                                >
+                                                    {player.name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="mt-4 text-gray-400">
+                                            Waiting for players... 
+                                            {state.players.length === 1 && "(Quiz will start in single player mode if no one joins in 30 seconds)"}
+                                        </p>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
 
-                {/* Countdown Overlay */}
-                <AnimatePresence>
-                    {state.countdown !== null && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 2 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0 }}
-                            className="absolute inset-0 flex items-center justify-center bg-black/50"
-                        >
-                            <div className="text-9xl font-bold text-white">
-                                {state.countdown}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                        {state.gameState === 'playing' && state.question && (
+                            <QuizGameplay
+                                socket={socket}
+                                roomId={roomId}
+                                currentQuestion={state.currentQuestion}
+                                timeLeft={state.timeLeft}
+                                players={state.players}
+                                selectedAnswer={state.selectedAnswer}
+                                showAnswer={state.showAnswer}
+                                correctAnswerStats={state.correctAnswerStats}
+                                streak={state.streak}
+                                multiplier={state.multiplier}
+                                showCorrectAnimation={state.showCorrectAnimation}
+                                showWrongAnimation={state.showWrongAnimation}
+                                activePowerUp={state.activePowerUp}
+                                powerUps={powerUps}
+                                handleAnswer={handleAnswer}
+                                usePowerUp={usePowerUp}
+                                question={state.question}
+                            />
+                        )}
+
+                        {state.gameState === 'results' && (
+                            <QuizResults
+                                players={state.players}
+                                achievements={achievements}
+                            />
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Chat Area - Fixed width */}
+                <div className="w-80 bg-gray-900/50 rounded-lg border border-gray-800 overflow-hidden">
+                    <div className="h-full">
+                        <div className="p-4 border-b border-gray-800">
+                            <h3 className="text-lg font-semibold text-white">Chat</h3>
+                        </div>
+                        <div className="h-[calc(100%-4rem)] overflow-y-auto p-4">
+                            {/* Chat messages would go here */}
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            {/* Overlays */}
+            <AnimatePresence>
+                {state.showScoreboard && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="absolute inset-0 flex items-center justify-center bg-black/50"
+                        onClick={toggleScoreboard}
+                    >
+                        <div
+                            className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-auto"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <QuizScoreboard players={state.players} />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Countdown Overlay */}
+            <AnimatePresence>
+                {state.countdown !== null && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 2 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        className="absolute inset-0 flex items-center justify-center bg-black/50"
+                    >
+                        <div className="text-9xl font-bold text-white">
+                            {state.countdown}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }; 

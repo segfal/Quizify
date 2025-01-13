@@ -61,6 +61,7 @@ export interface QuizState {
     isStarting: boolean;
     isActive: boolean;
     question: QuizQuestion | null;
+    mode: 'single' | 'multi';
 }
 
 export interface QuizGameplayProps {

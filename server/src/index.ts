@@ -18,12 +18,61 @@ interface Answer {
     points: number;
 }
 
+interface Question {
+    id: string;
+    question: string;
+    answers: string[];
+    correctAnswer: number;
+    timeLimit: number;
+}
+
 interface Room {
     players: Player[];
     currentQuestion: number;
     isActive: boolean;
     answers: Map<string, Answer>;
+    mode: 'single' | 'multi';
+    questions: Question[];
 }
+
+// Sample questions (in production, these should come from a database)
+const sampleQuestions: Question[] = [
+    {
+        id: '1',
+        question: 'What is 2 + 2?',
+        answers: ['3', '4', '5', '6'],
+        correctAnswer: 1,
+        timeLimit: 20
+    },
+    {
+        id: '2',
+        question: 'What is the capital of France?',
+        answers: ['London', 'Paris', 'Berlin', 'Madrid'],
+        correctAnswer: 1,
+        timeLimit: 20
+    },
+    {
+        id: '3',
+        question: 'Which planet is closest to the Sun?',
+        answers: ['Venus', 'Mercury', 'Mars', 'Earth'],
+        correctAnswer: 1,
+        timeLimit: 20
+    },
+    {
+        id: '4',
+        question: 'What is the largest mammal?',
+        answers: ['African Elephant', 'Blue Whale', 'Giraffe', 'Hippopotamus'],
+        correctAnswer: 1,
+        timeLimit: 20
+    },
+    {
+        id: '5',
+        question: 'Who painted the Mona Lisa?',
+        answers: ['Van Gogh', 'Leonardo da Vinci', 'Picasso', 'Michelangelo'],
+        correctAnswer: 1,
+        timeLimit: 20
+    }
+];
 
 dotenv.config();
 
@@ -75,10 +124,10 @@ io.on('connection', (socket) => {
     console.log('Socket connected:', socket.id);
 
     // Room Events
-    socket.on('join_room', (data: { roomId: string; playerName: string }) => {
-        const { roomId, playerName } = data;
+    socket.on('join_room', (data: { roomId: string; playerName: string; mode?: 'single' | 'multi' }) => {
+        const { roomId, playerName, mode = 'multi' } = data;
         socket.join(roomId);
-        console.log(`User ${socket.id} (${playerName}) joined room ${roomId}`);
+        console.log(`User ${socket.id} (${playerName}) joined room ${roomId} in ${mode} mode`);
 
         // Initialize room if it doesn't exist
         if (!rooms.has(roomId)) {
@@ -86,7 +135,9 @@ io.on('connection', (socket) => {
                 players: [],
                 currentQuestion: 0,
                 isActive: false,
-                answers: new Map()
+                answers: new Map(),
+                mode: mode,
+                questions: [...sampleQuestions] // Clone questions to avoid modifying the original
             });
         }
 
@@ -104,6 +155,11 @@ io.on('connection', (socket) => {
 
         // Notify room of new player
         io.to(roomId).emit('player_joined', player);
+
+        // If single player mode, start the game immediately
+        if (mode === 'single' && !room.isActive) {
+            startGame(roomId);
+        }
     });
 
     socket.on('leave_room', (data: { roomId: string }) => {
@@ -127,23 +183,7 @@ io.on('connection', (socket) => {
     // Quiz Events
     socket.on('start_quiz', (data: { roomId: string }) => {
         const { roomId } = data;
-        const room = rooms.get(roomId);
-        if (!room) return;
-
-        room.currentQuestion = 0;
-        room.isActive = true;
-        room.answers.clear();
-
-        // Send first question
-        const question = {
-            id: '1',
-            question: 'What is 2 + 2?',
-            answers: ['3', '4', '5', '6'],
-            correctAnswer: 1,
-            timeLimit: 20
-        };
-
-        io.to(roomId).emit('game_started', { question });
+        startGame(roomId);
     });
 
     socket.on('submit_answer', (data: {
@@ -158,18 +198,21 @@ io.on('connection', (socket) => {
         const room = rooms.get(roomId);
         if (!room || !room.isActive) return;
 
+        const currentQuestion = room.questions[room.currentQuestion];
+        const isCorrect = answer === currentQuestion.correctAnswer;
+
         // Record answer
         room.answers.set(socket.id, {
             answer,
             timeLeft,
-            points: points * multiplier
+            points: isCorrect ? points * multiplier : 0
         });
 
         // Update player score
         const player = room.players.find((p: Player) => p.id === socket.id);
         if (player) {
-            player.score += points * multiplier;
-            if (answer === 1) { // Assuming 1 is correct answer for this example
+            if (isCorrect) {
+                player.score += points * multiplier;
                 player.streak += 1;
             } else {
                 player.streak = 0;
@@ -179,107 +222,23 @@ io.on('connection', (socket) => {
         // Notify all players of the answer
         io.to(roomId).emit('answer_received', {
             playerId: socket.id,
-            isCorrect: answer === 1, // Assuming 1 is correct answer
-            points: points * multiplier,
+            isCorrect,
+            points: isCorrect ? points * multiplier : 0,
             players: room.players
         });
 
-        // If all players have answered, end the question
-        if (room.answers.size === room.players.length) {
-            const correctAnswers = Array.from(room.answers.values())
-                .filter((a: Answer) => a.answer === 1) // Assuming 1 is correct answer
-                .length;
+        // Check if we should move to next question
+        const shouldMoveNext = room.mode === 'single' || 
+            (room.mode === 'multi' && room.answers.size === room.players.length);
 
-            io.to(roomId).emit('question_ended', {
-                correctAnswer: 1, // Assuming 1 is correct answer
-                stats: {
-                    total: room.players.length,
-                    correct: correctAnswers,
-                    percentage: (correctAnswers / room.players.length) * 100
-                },
-                players: room.players
-            });
-
-            // Clear answers for next question
-            room.answers.clear();
-
-            // Move to next question after delay
-            setTimeout(() => {
-                room.currentQuestion += 1;
-                if (room.currentQuestion < 5) { // Assuming 5 questions total
-                    const nextQuestion = {
-                        id: (room.currentQuestion + 1).toString(),
-                        question: `Question ${room.currentQuestion + 1}`,
-                        answers: ['A', 'B', 'C', 'D'],
-                        correctAnswer: 1,
-                        timeLimit: 20
-                    };
-                    io.to(roomId).emit('next_question', {
-                        question: nextQuestion,
-                        currentQuestion: room.currentQuestion
-                    });
-                } else {
-                    room.isActive = false;
-                    io.to(roomId).emit('game_ended', room.players);
-                }
-            }, 3000);
+        if (shouldMoveNext) {
+            handleQuestionEnd(roomId);
         }
     });
 
     socket.on('time_up', (data: { roomId: string }) => {
         const { roomId } = data;
-        const room = rooms.get(roomId);
-        if (!room || !room.isActive) return;
-
-        // Handle players who didn't answer
-        room.players.forEach((player: Player) => {
-            if (!room.answers.has(player.id)) {
-                player.streak = 0;
-                room.answers.set(player.id, {
-                    answer: -1,
-                    timeLeft: 0,
-                    points: 0
-                });
-            }
-        });
-
-        // Trigger question end
-        const correctAnswers = Array.from(room.answers.values())
-            .filter((a: Answer) => a.answer === 1) // Assuming 1 is correct answer
-            .length;
-
-        io.to(roomId).emit('question_ended', {
-            correctAnswer: 1, // Assuming 1 is correct answer
-            stats: {
-                total: room.players.length,
-                correct: correctAnswers,
-                percentage: (correctAnswers / room.players.length) * 100
-            },
-            players: room.players
-        });
-
-        // Clear answers and move to next question
-        room.answers.clear();
-        room.currentQuestion += 1;
-
-        if (room.currentQuestion < 5) { // Assuming 5 questions total
-            setTimeout(() => {
-                const nextQuestion = {
-                    id: (room.currentQuestion + 1).toString(),
-                    question: `Question ${room.currentQuestion + 1}`,
-                    answers: ['A', 'B', 'C', 'D'],
-                    correctAnswer: 1,
-                    timeLimit: 20
-                };
-                io.to(roomId).emit('next_question', {
-                    question: nextQuestion,
-                    currentQuestion: room.currentQuestion
-                });
-            }, 3000);
-        } else {
-            room.isActive = false;
-            io.to(roomId).emit('game_ended', room.players);
-        }
+        handleQuestionEnd(roomId);
     });
 
     socket.on('disconnect', () => {
@@ -298,6 +257,77 @@ io.on('connection', (socket) => {
         console.error('Socket error:', error);
     });
 });
+
+// Helper functions
+function startGame(roomId: string) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    room.currentQuestion = 0;
+    room.isActive = true;
+    room.answers.clear();
+
+    // Reset player scores and streaks
+    room.players.forEach(player => {
+        player.score = 0;
+        player.streak = 0;
+    });
+
+    // Send first question
+    io.to(roomId).emit('game_started', { 
+        question: room.questions[0],
+        mode: room.mode
+    });
+}
+
+function handleQuestionEnd(roomId: string) {
+    const room = rooms.get(roomId);
+    if (!room || !room.isActive) return;
+
+    // Handle players who didn't answer
+    room.players.forEach((player: Player) => {
+        if (!room.answers.has(player.id)) {
+            player.streak = 0;
+            room.answers.set(player.id, {
+                answer: -1,
+                timeLeft: 0,
+                points: 0
+            });
+        }
+    });
+
+    const currentQuestion = room.questions[room.currentQuestion];
+    const correctAnswers = Array.from(room.answers.values())
+        .filter((a: Answer) => a.answer === currentQuestion.correctAnswer)
+        .length;
+
+    io.to(roomId).emit('question_ended', {
+        correctAnswer: currentQuestion.correctAnswer,
+        stats: {
+            total: room.players.length,
+            correct: correctAnswers,
+            percentage: (correctAnswers / room.players.length) * 100
+        },
+        players: room.players
+    });
+
+    // Clear answers and move to next question
+    room.answers.clear();
+    room.currentQuestion += 1;
+
+    // After a delay, either send next question or end game
+    setTimeout(() => {
+        if (room.currentQuestion < room.questions.length) {
+            io.to(roomId).emit('next_question', {
+                question: room.questions[room.currentQuestion],
+                currentQuestion: room.currentQuestion
+            });
+        } else {
+            room.isActive = false;
+            io.to(roomId).emit('game_ended', room.players);
+        }
+    }, 3000);
+}
 
 const PORT = process.env.PORT || 5003;
 
