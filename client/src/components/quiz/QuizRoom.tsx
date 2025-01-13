@@ -9,10 +9,8 @@ import { ACHIEVEMENTS } from '@/components/dummydata/QuizAchievements';
 import { POWER_UPS } from '@/components/dummydata/QuizPowerups';
 import { calculatePoints } from '@/utils/quiz/calculations';
 import { QuizGameplay } from './QuizGameplay';
-import { QuizScoreboard } from './QuizScoreboard';
-import { QuizResults } from './QuizResults';
-
-
+import { QuizScoreboard } from '@/components/quiz/QuizScoreboard';
+import { QuizResults } from '@/components/quiz/QuizResults';
 
 export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
     const [state, setState] = useState<QuizState>({
@@ -40,35 +38,92 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
     const [powerUps, setPowerUps] = useState<PowerUp[]>(POWER_UPS);
 
     useEffect(() => {
-        if (socket) {
-            socket.on('player_joined', (player: Player) => {
-                setState(prev => ({ ...prev, players: [...prev.players, player] }));
-                toast.success(`${player.name} joined the game!`);
-            });
+        if (!socket) return;
 
-            socket.on('score_update', (updatedPlayers: Player[]) => {
-                setState(prev => ({ ...prev, players: updatedPlayers }));
-            });
+        // Player events
+        socket.on('player_joined', (player: Player) => {
+            setState(prev => ({ ...prev, players: [...prev.players, player] }));
+            toast.success(`${player.name} joined the game!`);
+        });
 
-            socket.on('achievement_unlocked', (achievement: Achievement) => {
-                setAchievements(prev => {
-                    const newAchievements = [...prev];
-                    const achievementIndex = newAchievements.findIndex(a => a.id === achievement.id);
-                    if (achievementIndex !== -1) {
-                        newAchievements[achievementIndex] = { ...achievement };
-                    }
-                    return newAchievements;
-                });
-                setState(prev => ({ ...prev, recentAchievement: achievement }));
-                setTimeout(() => setState(prev => ({ ...prev, recentAchievement: null })), 5000);
-            });
+        socket.on('player_left', (playerId: string) => {
+            setState(prev => ({
+                ...prev,
+                players: prev.players.filter(p => p.id !== playerId)
+            }));
+        });
 
-            return () => {
-                socket.off('player_joined');
-                socket.off('score_update');
-                socket.off('achievement_unlocked');
-            };
-        }
+        // Game state events
+        socket.on('game_started', (data: { question: QuizQuestion }) => {
+            setState(prev => ({
+                ...prev,
+                gameState: 'playing',
+                question: data.question,
+                timeLeft: data.question.timeLimit,
+                selectedAnswer: null,
+                showAnswer: false,
+                correctAnswerStats: null
+            }));
+        });
+
+        socket.on('question_ended', (data: { 
+            correctAnswer: number,
+            stats: { total: number; correct: number; percentage: number },
+            players: Player[]
+        }) => {
+            setState(prev => ({
+                ...prev,
+                showAnswer: true,
+                correctAnswerStats: data.stats,
+                players: data.players
+            }));
+        });
+
+        socket.on('next_question', (data: { 
+            question: QuizQuestion,
+            currentQuestion: number 
+        }) => {
+            setState(prev => ({
+                ...prev,
+                currentQuestion: data.currentQuestion,
+                question: data.question,
+                timeLeft: data.question.timeLimit,
+                selectedAnswer: null,
+                showAnswer: false,
+                correctAnswerStats: null
+            }));
+        });
+
+        socket.on('game_ended', (finalPlayers: Player[]) => {
+            setState(prev => ({
+                ...prev,
+                gameState: 'results',
+                players: finalPlayers,
+                isActive: false
+            }));
+        });
+
+        socket.on('answer_received', (data: {
+            playerId: string,
+            isCorrect: boolean,
+            points: number,
+            players: Player[]
+        }) => {
+            setState(prev => ({
+                ...prev,
+                players: data.players
+            }));
+        });
+
+        return () => {
+            socket.off('player_joined');
+            socket.off('player_left');
+            socket.off('game_started');
+            socket.off('question_ended');
+            socket.off('next_question');
+            socket.off('game_ended');
+            socket.off('answer_received');
+        };
     }, [socket]);
 
     useEffect(() => {
@@ -77,7 +132,9 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             timer = setInterval(() => {
                 setState(prev => {
                     if (prev.timeLeft <= 1) {
-                        handleNextQuestion();
+                        if (socket) {
+                            socket.emit('time_up', { roomId });
+                        }
                         return { ...prev, timeLeft: 0 };
                     }
                     return { ...prev, timeLeft: prev.timeLeft - 1 };
@@ -85,65 +142,24 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             }, 1000);
         }
         return () => clearInterval(timer);
-    }, [state.gameState, state.timeLeft]);
+    }, [state.gameState, state.timeLeft, socket, roomId]);
 
     const startQuiz = () => {
         if (!socket) return;
         
         setState(prev => ({ ...prev, isStarting: true, countdown: 3 }));
-        
-        let count = 3;
-        const countdownInterval = setInterval(() => {
-            count -= 1;
-            if (count <= 0) {
-                clearInterval(countdownInterval);
-                setState(prev => ({
-                    ...prev,
-                    countdown: null,
-                    isStarting: false,
-                    isActive: true,
-                    gameState: 'playing',
-                    timeLeft: dummyQuestions[0].timeLimit,
-                    question: dummyQuestions[0]
-                }));
-                socket.emit('start_quiz', { roomId });
-            } else {
-                setState(prev => ({ ...prev, countdown: count }));
-            }
-        }, 1000);
-    };
-
-    const handleNextQuestion = () => {
-        if (state.currentQuestion < dummyQuestions.length - 1) {
-            const nextQuestion = state.currentQuestion + 1;
-            setState(prev => ({
-                ...prev,
-                currentQuestion: nextQuestion,
-                timeLeft: dummyQuestions[nextQuestion].timeLimit,
-                selectedAnswer: null,
-                showAnswer: false,
-                correctAnswerStats: null,
-                question: dummyQuestions[nextQuestion]
-            }));
-        } else {
-            setState(prev => ({
-                ...prev,
-                gameState: 'results',
-                isActive: false
-            }));
-        }
+        socket.emit('start_quiz', { roomId });
     };
 
     const handleAnswer = (answerIndex: number) => {
-        if (!socket || !state.question || state.selectedAnswer !== null) return;
+        if (!socket || !state.question || state.selectedAnswer !== null || !state.isActive) return;
         
         setState(prev => ({ ...prev, selectedAnswer: answerIndex }));
         
         const isCorrect = answerIndex === state.question.correctAnswer;
+        const points = calculatePoints(state.timeLeft, state.multiplier);
         
         if (isCorrect) {
-            const points = calculatePoints(state.timeLeft, state.multiplier);
-            
             setState(prev => ({
                 ...prev,
                 showCorrectAnimation: true,
@@ -152,15 +168,6 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             }));
             
             setTimeout(() => setState(prev => ({ ...prev, showCorrectAnimation: false })), 1000);
-            
-            socket.emit('quiz_answer', {
-                roomId,
-                questionId: state.question.id,
-                answer: answerIndex,
-                timeLeft: state.timeLeft,
-                points,
-                multiplier: state.activePowerUp === 'double_points' ? state.multiplier * 2 : state.multiplier
-            });
         } else {
             setState(prev => ({
                 ...prev,
@@ -170,45 +177,21 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             }));
             
             setTimeout(() => setState(prev => ({ ...prev, showWrongAnimation: false })), 1000);
-            
-            socket.emit('quiz_answer', {
-                roomId,
-                questionId: state.question.id,
-                answer: answerIndex,
-                timeLeft: state.timeLeft,
-                points: 0,
-                multiplier: 1
-            });
         }
 
-        setTimeout(() => {
-            const totalAnswers = state.players.length;
-            const correctAnswers = state.players.filter(p => 
-                p.lastAnswer !== undefined && p.lastAnswer === state.question?.correctAnswer
-            ).length;
-            
-            setState(prev => ({
-                ...prev,
-                showAnswer: true,
-                correctAnswerStats: {
-                    total: totalAnswers,
-                    correct: correctAnswers,
-                    percentage: (correctAnswers / totalAnswers) * 100
-                }
-            }));
-        }, 1000);
-
-        setTimeout(() => {
-            setState(prev => ({
-                ...prev,
-                showAnswer: false,
-                correctAnswerStats: null
-            }));
-            handleNextQuestion();
-        }, 3000);
+        socket.emit('submit_answer', {
+            roomId,
+            questionId: state.question.id,
+            answer: answerIndex,
+            timeLeft: state.timeLeft,
+            points: isCorrect ? points : 0,
+            multiplier: state.activePowerUp === 'double_points' ? state.multiplier * 2 : state.multiplier
+        });
     };
 
     const usePowerUp = (powerUpId: string) => {
+        if (!socket || !state.isActive) return;
+
         setPowerUps(prev => {
             const newPowerUps = [...prev];
             const powerUp = newPowerUps.find(p => p.id === powerUpId);
@@ -216,19 +199,13 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
                 powerUp.available = false;
                 setState(prev => ({ ...prev, activePowerUp: powerUpId }));
                 
-                new Audio('/sounds/powerup.mp3').play().catch(() => {});
+                socket.emit('use_power_up', {
+                    roomId,
+                    powerUpId,
+                    questionId: state.question?.id
+                });
 
-                switch (powerUpId) {
-                    case 'time_freeze':
-                        // Pause timer for 5 seconds
-                        break;
-                    case '50_50':
-                        // Remove two wrong answers
-                        break;
-                    case 'double_points':
-                        // Double points handled in handleAnswer
-                        break;
-                }
+                new Audio('/sounds/powerup.mp3').play().catch(() => {});
             }
             return newPowerUps;
         });
@@ -242,138 +219,134 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         <div className="absolute inset-0 flex flex-col bg-gradient-to-br from-purple-900 to-blue-900">
             {/* Header Controls */}
             <div className="flex justify-between items-center p-4 bg-black/20">
-                <h1 className="text-3xl font-bold text-white">Python Lists Quiz</h1>
+                <h1 className="text-3xl font-bold text-white">Quiz Room: {roomId}</h1>
                 <div className="flex gap-2">
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={toggleScoreboard}
                         className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white"
                     >
-                        {state.showScoreboard ? 'Hide Scores' : 'Show Scores'}
+                        Scoreboard
                     </motion.button>
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={onClose}
                         className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
                     >
-                        Close
+                        Leave
                     </motion.button>
                 </div>
             </div>
 
-            {/* Scoreboard Overlay */}
-            <AnimatePresence>
-                {state.showScoreboard && (
-                    <QuizScoreboard players={state.players} />
-                )}
-            </AnimatePresence>
-
-            {/* Achievement Notification */}
-            <AnimatePresence>
-                {state.recentAchievement && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -50 }}
-                        className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50"
-                    >
-                        <div className="bg-yellow-500 text-black px-6 py-3 rounded-full flex items-center gap-3">
-                            {state.recentAchievement.icon}
-                            <div>
-                                <p className="font-bold">{state.recentAchievement.name}</p>
-                                <p className="text-sm">{state.recentAchievement.description}</p>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Countdown Overlay */}
-            <AnimatePresence>
-                {state.countdown !== null && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 2 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0 }}
-                        className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center"
-                    >
+            {/* Main Content */}
+            <div className="flex-1 p-8 overflow-hidden">
+                <AnimatePresence mode="wait">
+                    {state.gameState === 'waiting' && (
                         <motion.div
-                            key={state.countdown}
-                            initial={{ scale: 2, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            className="text-9xl font-bold text-white"
+                            key="waiting"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="text-center"
                         >
-                            {state.countdown}
+                            <h2 className="text-4xl font-bold text-white mb-8">
+                                Waiting for players...
+                            </h2>
+                            {state.players.length > 0 && (
+                                <div className="mb-8">
+                                    <h3 className="text-2xl font-bold text-white mb-4">
+                                        Players ({state.players.length})
+                                    </h3>
+                                    <div className="flex flex-wrap justify-center gap-4">
+                                        {state.players.map(player => (
+                                            <div
+                                                key={player.id}
+                                                className="px-4 py-2 bg-white/10 rounded-lg text-white"
+                                            >
+                                                {player.name}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {state.players.length >= 2 && !state.isStarting && (
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={startQuiz}
+                                    className="px-8 py-4 bg-green-500 hover:bg-green-600 rounded-xl text-2xl font-bold text-white"
+                                >
+                                    Start Quiz
+                                </motion.button>
+                            )}
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
 
-            {/* Main Quiz Area */}
-            <div className="flex-1 p-8 overflow-y-auto">
-                {state.gameState === 'waiting' ? (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center h-full"
-                    >
-                        <h2 className="text-7xl font-bold mb-12 text-white">
-                            Python Lists Quiz
-                            <span className="block text-3xl mt-4 text-purple-300">
-                                Get ready to play! 🎮
-                            </span>
-                        </h2>
-                        <div className="mb-12 w-full max-w-3xl">
-                            <h3 className="text-3xl mb-6 text-purple-200">Players in Lobby</h3>
-                            <div className="flex flex-wrap justify-center gap-4">
-                                {state.players.map((player) => (
-                                    <motion.div
-                                        key={player.id}
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        className="px-6 py-3 bg-purple-500/20 rounded-lg text-xl"
-                                    >
-                                        {player.name}
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </div>
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={startQuiz}
-                            className="px-12 py-6 bg-purple-500 hover:bg-purple-600 rounded-xl text-2xl font-bold text-white shadow-lg"
+                    {state.gameState === 'playing' && state.question && (
+                        <QuizGameplay
+                            socket={socket}
+                            roomId={roomId}
+                            currentQuestion={state.currentQuestion}
+                            timeLeft={state.timeLeft}
+                            players={state.players}
+                            selectedAnswer={state.selectedAnswer}
+                            showAnswer={state.showAnswer}
+                            correctAnswerStats={state.correctAnswerStats}
+                            streak={state.streak}
+                            multiplier={state.multiplier}
+                            showCorrectAnimation={state.showCorrectAnimation}
+                            showWrongAnimation={state.showWrongAnimation}
+                            activePowerUp={state.activePowerUp}
+                            powerUps={powerUps}
+                            handleAnswer={handleAnswer}
+                            usePowerUp={usePowerUp}
+                            question={state.question}
+                        />
+                    )}
+
+                    {state.gameState === 'results' && (
+                        <QuizResults
+                            players={state.players}
+                            achievements={achievements}
+                        />
+                    )}
+                </AnimatePresence>
+
+                {/* Scoreboard Overlay */}
+                <AnimatePresence>
+                    {state.showScoreboard && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="absolute inset-0 flex items-center justify-center bg-black/50"
+                            onClick={toggleScoreboard}
                         >
-                            Start Game
-                        </motion.button>
-                    </motion.div>
-                ) : state.gameState === 'playing' ? (
-                    <QuizGameplay
-                        socket={socket}
-                        roomId={roomId}
-                        currentQuestion={state.currentQuestion}
-                        timeLeft={state.timeLeft}
-                        players={state.players}
-                        selectedAnswer={state.selectedAnswer}
-                        showAnswer={state.showAnswer}
-                        correctAnswerStats={state.correctAnswerStats}
-                        streak={state.streak}
-                        multiplier={state.multiplier}
-                        showCorrectAnimation={state.showCorrectAnimation}
-                        showWrongAnimation={state.showWrongAnimation}
-                        activePowerUp={state.activePowerUp}
-                        powerUps={powerUps}
-                        handleAnswer={handleAnswer}
-                        usePowerUp={usePowerUp}
-                        question={state.question}
-                    />
-                ) : (
-                    <QuizResults
-                        players={state.players}
-                        achievements={achievements.filter(a => a.unlocked)}
-                    />
-                )}
+                            <div
+                                className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-auto"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <QuizScoreboard players={state.players} />
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Countdown Overlay */}
+                <AnimatePresence>
+                    {state.countdown !== null && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 2 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0 }}
+                            className="absolute inset-0 flex items-center justify-center bg-black/50"
+                        >
+                            <div className="text-9xl font-bold text-white">
+                                {state.countdown}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );

@@ -1,3 +1,6 @@
+import { Socket } from 'socket.io-client';
+
+
 export interface ChatMessage {
     message: string;
     roomId: string;
@@ -8,5 +11,5 @@ export interface ChatMessage {
 
 export interface ChatProps {
     roomId: string;
-    socket: any; // TODO: Replace with proper Socket type
+    socket: Socket;
 }
