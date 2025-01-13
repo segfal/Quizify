@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useSupabase } from "@/contexts/SupabaseContext";
 import { motion } from "framer-motion";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setUser } from "@/store/slices/userSlice";
+import { RootState } from "@/store/store";
 
 // Dynamically import components that use browser APIs
 const AnimatedBackground = dynamic(() => import("@/components/ui/AnimatedBackground"), {
@@ -31,13 +32,21 @@ export default function LoginPage() {
     const router = useRouter();
     const { signIn } = useSupabase();
     const dispatch = useDispatch();
+    const user = useSelector((state: RootState) => state.user);
+
+    // Check if user is already logged in
+    useEffect(() => {
+        if (user.isAuthenticated) {
+            router.push("/dashboard");
+        }
+    }, [user.isAuthenticated, router]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        const { user, error } = await signIn(emailOrUsername, password);
+        const { user: userData, error: loginError } = await signIn(emailOrUsername, password);
 
-        if (error) {
+        if (loginError) {
             setError(true);
             const form = e.target as HTMLFormElement;
             form.classList.add('error-shake');
@@ -46,26 +55,43 @@ export default function LoginPage() {
                 setError(false);
                 form.classList.remove('error-shake');
             }, 7000);
+            return;
         }
 
-        if (user) {
+        if (userData) {
             // Dispatch user data to Redux
             dispatch(setUser({
-                id: user.user_id,
-                username: user.username,
-                email: user.email,
-                role: user.role || 'student'
+                id: userData.user_id,
+                username: userData.username,
+                email: userData.email,
+                role: userData.role || 'student'
             }));
 
             const form = e.target as HTMLFormElement;
             form.classList.add('success');
             await new Promise(resolve => setTimeout(resolve, 800));
-            router.push("/success");
+            router.push("/dashboard");
         }
     };
 
+    // If already logged in, show loading state
+    if (user.isAuthenticated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-900">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-white text-center"
+                >
+                    <div className="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p>Already logged in, redirecting...</p>
+                </motion.div>
+            </div>
+        );
+    }
+
     return (
-        <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        <div className="relative min-h-screen">
             <AnimatedBackground />
             <AnimatedErrorBackground isVisible={error} />
             
@@ -78,7 +104,7 @@ export default function LoginPage() {
                     onSubmit={handleLogin}
                     className={`
                         bg-black/50 backdrop-blur-lg p-8 rounded-2xl 
-                        border border-white/10 w-[400px]
+                        border border-white/10 w-[400px] mx-auto mt-20
                         transition-all duration-300
                         success:border-green-500/50 success:bg-green-500/10
                     `}
@@ -95,6 +121,7 @@ export default function LoginPage() {
                                 placeholder="Email or Username"
                                 value={emailOrUsername}
                                 onChange={(e) => setEmailOrUsername(e.target.value)}
+                                required
                                 className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                             />
                         </div>
@@ -104,6 +131,7 @@ export default function LoginPage() {
                                 placeholder="Password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
+                                required
                                 className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                             />
                         </div>
@@ -114,27 +142,8 @@ export default function LoginPage() {
                             type="submit"
                             className="w-full bg-white/10 hover:bg-white/20 text-white"
                         >
-                            Sign In
+                            Login
                         </Button>
-
-                        <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10">
-                            <p className="text-white/80 text-sm text-center font-medium">
-                                Login Credentials:
-                            </p>
-                            <div className="mt-2 space-y-1 text-center">
-                                <p className="text-emerald-400/90 text-sm">
-                                    username: <span className="font-mono bg-white/5 px-2 py-0.5 rounded">a</span>{" "}
-                                    password: <span className="font-mono bg-white/5 px-2 py-0.5 rounded">a</span>
-                                </p>
-                                <p className="text-emerald-400/90 text-sm">
-                                    username: <span className="font-mono bg-white/5 px-2 py-0.5 rounded">password</span>{" "}
-                                    password: <span className="font-mono bg-white/5 px-2 py-0.5 rounded">password</span>
-                                </p>
-                                <p className="text-white/60 text-xs italic mt-2">
-                                    (Hint: The password is above)
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </motion.form>
             </motion.div>
