@@ -35,6 +35,15 @@ interface Room {
     questions: Question[];
 }
 
+// Add chat message interface
+interface ChatMessage {
+    roomId: string;
+    message: string;
+    userId: string;
+    username: string;
+    timestamp?: number;
+}
+
 // Sample questions (in production, these should come from a database)
 const sampleQuestions: Question[] = [
     {
@@ -122,6 +131,17 @@ app.get('/health', (req, res) => {
 
 io.on('connection', (socket) => {
     console.log('Socket connected:', socket.id);
+
+    // Add chat message handler
+    socket.on('message', (data: ChatMessage) => {
+        const messageData = {
+            ...data,
+            timestamp: Date.now()
+        };
+        
+        // Broadcast message to all users in the room
+        io.to(data.roomId).emit('message', messageData);
+    });
 
     // Room Events
     socket.on('join_room', (data: { roomId: string; playerName: string; mode?: 'single' | 'multi' }) => {

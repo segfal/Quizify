@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import { QuizQuestion, Player, Achievement, PowerUp, QuizState, QuizRoomProps } from '@/interfaces/quiz/types';
+import { ChatMessage } from '@/interfaces/chat/types';
 import { dummyQuestions } from '@/components/dummydata/QuizQuestions';
 import { ACHIEVEMENTS } from '@/components/dummydata/QuizAchievements';
 import { POWER_UPS } from '@/components/dummydata/QuizPowerups';
@@ -41,6 +42,10 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
     const [achievements, setAchievements] = useState<Achievement[]>(ACHIEVEMENTS);
     const [powerUps, setPowerUps] = useState<PowerUp[]>(POWER_UPS);
     const [waitingTimeout, setWaitingTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messageInput, setMessageInput] = useState('');
+    const chatEndRef = useRef<HTMLDivElement>(null);
+    const processedMessageIds = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         if (!socket) return;
@@ -182,6 +187,33 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         };
     }, [state.countdown]);
 
+    // Add chat socket events
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleMessage = (messageData: ChatMessage) => {
+            const messageId = `${messageData.timestamp}-${messageData.userId}`;
+            
+            if (processedMessageIds.current.has(messageId)) {
+                return;
+            }
+
+            processedMessageIds.current.add(messageId);
+            setMessages(prev => [...prev, messageData]);
+        };
+
+        socket.on('message', handleMessage);
+
+        return () => {
+            socket.off('message', handleMessage);
+        };
+    }, [socket]);
+
+    // Auto scroll chat to bottom
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
     const startQuiz = (mode: 'single' | 'multi' = 'multi') => {
         if (!socket) return;
         
@@ -275,6 +307,21 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
 
     const toggleScoreboard = () => {
         setState(prev => ({ ...prev, showScoreboard: !prev.showScoreboard }));
+    };
+
+    const sendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!socket || !messageInput.trim()) return;
+
+        const messageData = {
+            roomId,
+            message: messageInput.trim(),
+            userId: socket.id,
+            username: authUser.username
+        };
+
+        socket.emit('message', messageData);
+        setMessageInput('');
     };
 
     return (
@@ -390,15 +437,55 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
                 </div>
 
                 {/* Chat Area - Fixed width */}
-                <div className="w-80 bg-gray-900/50 rounded-lg border border-gray-800 overflow-hidden">
-                    <div className="h-full">
-                        <div className="p-4 border-b border-gray-800">
-                            <h3 className="text-lg font-semibold text-white">Chat</h3>
-                        </div>
-                        <div className="h-[calc(100%-4rem)] overflow-y-auto p-4">
-                            {/* Chat messages would go here */}
+                <div className="w-80 bg-gray-900/50 rounded-lg border border-gray-800 overflow-hidden flex flex-col">
+                    <div className="p-4 border-b border-gray-800">
+                        <h3 className="text-lg font-semibold text-white">Chat</h3>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4">
+                        <div className="space-y-4">
+                            {messages.map((msg, index) => (
+                                <div
+                                    key={`${msg.timestamp}-${index}`}
+                                    className={`flex flex-col ${
+                                        msg.userId === socket?.id ? 'items-end' : 'items-start'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-400">
+                                            {msg.username}:
+                                        </span>
+                                    </div>
+                                    <div
+                                        className={`rounded-lg px-3 py-2 max-w-[80%] break-words ${
+                                            msg.userId === socket?.id
+                                                ? 'bg-purple-500 text-white'
+                                                : 'bg-gray-700 text-white'
+                                        }`}
+                                    >
+                                        {msg.message}
+                                    </div>
+                                </div>
+                            ))}
+                            <div ref={chatEndRef} />
                         </div>
                     </div>
+                    <form onSubmit={sendMessage} className="p-4 border-t border-gray-800">
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={messageInput}
+                                onChange={(e) => setMessageInput(e.target.value)}
+                                placeholder="Type a message..."
+                                className="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <button
+                                type="submit"
+                                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white transition-colors"
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

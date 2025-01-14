@@ -2,11 +2,11 @@ import { Socket } from 'socket.io-client';
 
 
 export interface ChatMessage {
-    message: string;
     roomId: string;
+    message: string;
     userId: string;
     username: string;
-    timestamp?: string;
+    timestamp?: number;
 }
 
 export interface ChatProps {
