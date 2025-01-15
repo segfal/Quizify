@@ -3,85 +3,9 @@ import { Server } from 'socket.io';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { Player, Answer,Room, ChatMessage } from './interfaces';
 
-// Types
-interface Player {
-    id: string;
-    name: string;
-    score: number;
-    streak: number;
-}
-
-interface Answer {
-    answer: number;
-    timeLeft: number;
-    points: number;
-}
-
-interface Question {
-    id: string;
-    question: string;
-    answers: string[];
-    correctAnswer: number;
-    timeLimit: number;
-}
-
-interface Room {
-    players: Player[];
-    currentQuestion: number;
-    isActive: boolean;
-    answers: Map<string, Answer>;
-    mode: 'single' | 'multi';
-    questions: Question[];
-}
-
-// Add chat message interface
-interface ChatMessage {
-    roomId: string;
-    message: string;
-    userId: string;
-    username: string;
-    timestamp?: number;
-}
-
-// Sample questions (in production, these should come from a database)
-const sampleQuestions: Question[] = [
-    {
-        id: '1',
-        question: 'What is 2 + 2?',
-        answers: ['3', '4', '5', '6'],
-        correctAnswer: 1,
-        timeLimit: 20
-    },
-    {
-        id: '2',
-        question: 'What is the capital of France?',
-        answers: ['London', 'Paris', 'Berlin', 'Madrid'],
-        correctAnswer: 1,
-        timeLimit: 20
-    },
-    {
-        id: '3',
-        question: 'Which planet is closest to the Sun?',
-        answers: ['Venus', 'Mercury', 'Mars', 'Earth'],
-        correctAnswer: 1,
-        timeLimit: 20
-    },
-    {
-        id: '4',
-        question: 'What is the largest mammal?',
-        answers: ['African Elephant', 'Blue Whale', 'Giraffe', 'Hippopotamus'],
-        correctAnswer: 1,
-        timeLimit: 20
-    },
-    {
-        id: '5',
-        question: 'Who painted the Mona Lisa?',
-        answers: ['Van Gogh', 'Leonardo da Vinci', 'Picasso', 'Michelangelo'],
-        correctAnswer: 1,
-        timeLimit: 20
-    }
-];
+import { sampleQuestions } from './questions/sampleQuestions';
 
 dotenv.config();
 
