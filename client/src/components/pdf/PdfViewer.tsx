@@ -101,61 +101,52 @@ export function PdfViewer({ roomId }: PdfViewerProps) {
     };
 
     return (
-        <div className="h-full bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-blue-400">PDF Files</h2>
+        <div className="w-full h-full flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4">
+                <h2 className="text-xl font-semibold text-white">PDF Files</h2>
                 <PdfUpload roomId={roomId} onUpload={handleFileUpload} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-blue-400 mb-2">Uploaded Files</h3>
-                    {isLoading ? (
-                        <div className="flex justify-center py-4">
-                            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        </div>
-                    ) : notes.length === 0 ? (
-                        <div className="text-center text-gray-400 py-4">
-                            No files uploaded yet
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {notes.map((note) => (
-                                <div
-                                    key={note.note_id}
-                                    className="flex items-center justify-between group hover:bg-blue-500/10 rounded-lg p-2 transition-colors"
-                                >
-                                    <button
-                                        onClick={() => setSelectedPdf(note.url)}
-                                        className={`text-sm ${selectedPdf === note.url ? 'text-blue-400' : 'text-white/70'} hover:text-white truncate flex-1 text-left`}
+            <div className="flex-1 w-full overflow-y-auto px-4">
+                {isLoading ? (
+                    <div className="flex items-center justify-center h-24">
+                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : notes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-24 text-gray-400">
+                        <p>No files uploaded yet</p>
+                        <p className="text-sm">Upload a PDF to get started</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 pb-4">
+                        {notes.map((note) => (
+                            <div
+                                key={note.note_id}
+                                className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 flex flex-col gap-2 hover:bg-gray-700/50 transition-colors"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <a
+                                        href={note.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-400 hover:text-blue-300 transition-colors line-clamp-2 flex-1"
                                     >
                                         {note.filename}
-                                    </button>
+                                    </a>
                                     <button
                                         onClick={() => handleDeleteNote(note.note_id)}
-                                        className="p-1 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="text-gray-400 hover:text-red-400 transition-colors p-1 rounded-full hover:bg-gray-600/50"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="bg-gray-900/50 rounded-lg p-4 min-h-[400px]">
-                    {selectedPdf ? (
-                        <iframe
-                            src={selectedPdf}
-                            className="w-full h-full min-h-[400px] rounded-lg"
-                            title="PDF Viewer"
-                        />
-                    ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
-                            Select a PDF to view
-                        </div>
-                    )}
-                </div>
+                                <div className="text-xs text-gray-400">
+                                    Uploaded {new Date(note.upload_date).toLocaleDateString()}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

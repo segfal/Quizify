@@ -371,7 +371,7 @@ export default function RoomPage() {
                             </div>
 
                             {selectedFeature === 'whiteboard' && (
-                                <div className="relative">
+                                <div className="relative h-[calc(100vh-24rem)]">
                                     <button
                                         onClick={() => {
                                             setSelectedFeature(null);
@@ -390,24 +390,28 @@ export default function RoomPage() {
                             )}
 
                             {selectedFeature === 'quiz' && socket && (
-                                <QuizRoom 
-                                    socket={socket}
-                                    roomId={roomId}
-                                    onClose={() => setSelectedFeature(null)}
-                                />
+                                <div className="h-[calc(100vh-24rem)]">
+                                    <QuizRoom 
+                                        socket={socket}
+                                        roomId={roomId}
+                                        onClose={() => setSelectedFeature(null)}
+                                    />
+                                </div>
                             )}
 
-                            <Notes
-                                roomId={roomId}
-                                initialContent={notes}
-                                onUpdate={handleNotesUpdate}
-                            />
+                            <div className="h-[calc(100vh-36rem)]">
+                                <Notes
+                                    roomId={roomId}
+                                    initialContent={notes}
+                                    onUpdate={handleNotesUpdate}
+                                />
+                            </div>
                         </div>
 
                         {/* Right Sidebar - Chat */}
                         <div className="space-y-6">
                             {socket && (
-                                <div className="h-[calc(100vh-8rem)] bg-gray-900/50 rounded-lg border border-gray-800">
+                                <div className="h-[calc(100vh-16rem)] bg-gray-900/50 rounded-lg border border-gray-800">
                                     <Chat 
                                         roomId={roomId}
                                         socket={socket}
