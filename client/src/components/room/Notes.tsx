@@ -99,6 +99,7 @@ export const Notes = ({ roomId, initialContent = '', onUpdate }: NotesProps) => 
         }
     };
 
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -112,9 +113,9 @@ export const Notes = ({ roomId, initialContent = '', onUpdate }: NotesProps) => 
                 </TabsList>
 
                 <TabsContent value="notes" className="h-[calc(100%-48px)]">
-                    <div className="h-full bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold text-blue-400">Notes</h2>
+                    <div className="h-full bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-lg font-semibold text-blue-400">Notes</h2>
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: content !== initialContent ? 1 : 0 }}
@@ -124,32 +125,32 @@ export const Notes = ({ roomId, initialContent = '', onUpdate }: NotesProps) => 
                             </motion.div>
                         </div>
                         <div className="flex h-[calc(100%-2rem)]">
-                            <div className="flex-1 pr-4">
+                            <div className="flex-1 pr-3">
                                 <textarea
                                     value={content}
                                     onChange={(e) => setContent(e.target.value)}
-                                    className="w-full h-full bg-transparent resize-none focus:outline-none text-white/90 placeholder-white/30"
+                                    className="w-full h-full bg-transparent resize-none focus:outline-none text-white/90 placeholder-white/30 text-sm"
                                     placeholder="Type your notes here..."
                                 />
                             </div>
-                            <div className="w-64 border-l border-blue-500/20 pl-4">
-                                <h3 className="text-sm font-semibold text-blue-400 mb-2">Uploaded Files</h3>
+                            <div className="w-48 border-l border-blue-500/20 pl-3">
+                                <h3 className="text-xs font-semibold text-blue-400 mb-2">Uploaded Files</h3>
                                 {isLoading ? (
-                                    <div className="flex justify-center py-4">
-                                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                    <div className="flex justify-center py-2">
+                                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                                     </div>
                                 ) : (
-                                    <div className="space-y-2">
+                                    <div className="space-y-1.5 max-h-[calc(100%-2rem)] overflow-y-auto">
                                         {pdfFiles.map((file) => (
                                             <div
                                                 key={file.note_id}
-                                                className="flex items-center justify-between group hover:bg-blue-500/10 rounded-lg p-2 transition-colors"
+                                                className="flex items-center justify-between group hover:bg-blue-500/10 rounded-lg p-1.5 transition-colors"
                                             >
                                                 <a
                                                     href={file.url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-sm text-white/70 hover:text-white truncate flex-1"
+                                                    className="text-xs text-white/70 hover:text-white truncate flex-1"
                                                 >
                                                     {file.filename}
                                                 </a>
@@ -157,7 +158,7 @@ export const Notes = ({ roomId, initialContent = '', onUpdate }: NotesProps) => 
                                                     onClick={() => handleDeleteNote(file.note_id)}
                                                     className="p-1 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Trash2 className="w-3 h-3" />
                                                 </button>
                                             </div>
                                         ))}

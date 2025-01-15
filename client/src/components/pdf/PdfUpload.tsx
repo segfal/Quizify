@@ -68,7 +68,7 @@ export function PdfUpload({ roomId, onUpload }: PdfUploadProps) {
     };
 
     return (
-        <div>
+        <div className="w-full sm:w-auto">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -82,12 +82,14 @@ export function PdfUpload({ roomId, onUpload }: PdfUploadProps) {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`
-                    px-4 py-2 rounded-lg flex items-center gap-2 transition-colors
+                    w-full sm:w-auto px-6 py-2.5 rounded-lg flex items-center justify-center gap-3
+                    font-medium transition-all duration-200
                     ${isDragging
-                        ? 'bg-green-500 text-white'
-                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                        ? 'bg-green-500/80 text-white ring-2 ring-green-400/50 ring-offset-2 ring-offset-[#0B1120]'
+                        : 'bg-blue-500/80 hover:bg-blue-600/80 text-white'
                     }
-                    ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
+                    ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-blue-500/10'}
+                    backdrop-blur-sm
                 `}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -96,12 +98,12 @@ export function PdfUpload({ roomId, onUpload }: PdfUploadProps) {
                 {isUploading ? (
                     <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Uploading...
+                        <span>Uploading...</span>
                     </>
                 ) : (
                     <>
                         <Upload className="w-4 h-4" />
-                        {isDragging ? 'Drop PDF here' : 'Upload PDF'}
+                        <span>{isDragging ? 'Drop PDF here' : 'Upload PDF'}</span>
                     </>
                 )}
             </motion.button>
