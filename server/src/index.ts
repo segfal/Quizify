@@ -134,13 +134,20 @@ io.on('connection', (socket) => {
 
     // Add chat message handler
     socket.on('message', (data: ChatMessage) => {
+        console.log('Message received:', data);
+        
         const messageData = {
             ...data,
             timestamp: Date.now()
         };
         
-        // Broadcast message to all users in the room
-        io.to(data.roomId).emit('message', messageData);
+        // Make sure the socket is in the room before broadcasting
+        if (!socket.rooms.has(data.roomId)) {
+            socket.join(data.roomId);
+        }
+        
+        // Broadcast message to all users in the room (including sender)
+        io.in(data.roomId).emit('message', messageData);
     });
 
     // Room Events

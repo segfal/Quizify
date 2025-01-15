@@ -192,13 +192,21 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
         if (!socket) return;
 
         const handleMessage = (messageData: ChatMessage) => {
+            console.log('Message received:', messageData);
+            
+            // Generate a unique message ID
             const messageId = `${messageData.timestamp}-${messageData.userId}`;
             
+            // Check if we've already processed this message
             if (processedMessageIds.current.has(messageId)) {
+                console.log('Duplicate message detected, skipping:', messageId);
                 return;
             }
 
+            // Add message ID to processed set
             processedMessageIds.current.add(messageId);
+            
+            // Update messages state
             setMessages(prev => [...prev, messageData]);
         };
 
@@ -206,6 +214,7 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
 
         return () => {
             socket.off('message', handleMessage);
+            processedMessageIds.current.clear();
         };
     }, [socket]);
 
@@ -317,7 +326,8 @@ export const QuizRoom = ({ socket, roomId, onClose }: QuizRoomProps) => {
             roomId,
             message: messageInput.trim(),
             userId: socket.id,
-            username: authUser.username
+            username: authUser.username || 'Anonymous Player',
+            timestamp: Date.now()
         };
 
         socket.emit('message', messageData);
