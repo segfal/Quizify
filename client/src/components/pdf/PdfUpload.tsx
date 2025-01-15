@@ -1,94 +1,110 @@
 'use client';
 
-import { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/utils/supabase/client';
-import type { DragEvent } from 'react';
-import type { PdfUploadProps } from '@/interfaces/pdf/types';
 
-export function PdfUpload({ userId, onUploadSuccess }: PdfUploadProps) {
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        if (acceptedFiles.length === 0) {
-            toast.error('Please select a PDF file');
+interface PdfUploadProps {
+    roomId: string;
+    onUpload: (file: File) => Promise<void>;
+}
+
+export function PdfUpload({ roomId, onUpload }: PdfUploadProps) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            await handleFile(file);
+        }
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            await handleFile(file);
+        }
+    };
+
+    const handleFile = async (file: File) => {
+        // Check if file is PDF
+        if (file.type !== 'application/pdf') {
+            toast.error('Please upload a PDF file');
             return;
         }
 
-        const file = acceptedFiles[0];
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `${userId}_${timestamp}_${file.name}`;
+        // Check file size (max 30MB)
+        if (file.size > 30 * 1024 * 1024) {
+            toast.error('File size must be less than 30MB');
+            return;
+        }
 
         try {
-            const { data, error } = await supabase.storage
-                .from('pdfstore')
-                .upload(fileName, file, {
-                    contentType: 'application/pdf',
-                    cacheControl: '3600'
-                });
-
-            if (error) throw error;
-
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('pdfstore')
-                .getPublicUrl(fileName);
-
-            toast.success('PDF uploaded successfully!');
-            onUploadSuccess(publicUrl);
+            setIsUploading(true);
+            await onUpload(file);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         } catch (error) {
-            console.error('Error uploading PDF:', error);
-            toast.error('Failed to upload PDF');
+            console.error('Error uploading file:', error);
+            toast.error('Failed to upload file');
+        } finally {
+            setIsUploading(false);
         }
-    }, [userId, onUploadSuccess]);
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: {
-            'application/pdf': ['.pdf']
-        },
-        maxFiles: 1,
-        multiple: false,
-        onDragEnter: (event: DragEvent) => {
-            event.preventDefault();
-        },
-        onDragOver: (event: DragEvent) => {
-            event.preventDefault();
-        },
-        onDragLeave: (event: DragEvent) => {
-            event.preventDefault();
-        }
-    });
-
-    const dropzoneProps = getRootProps();
-    const inputProps = getInputProps();
+    };
 
     return (
-        <div
-            {...dropzoneProps}
-            className={`
-                p-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors
-                ${isDragActive 
-                    ? 'border-purple-500 bg-purple-500/10' 
-                    : 'border-gray-700 hover:border-purple-500/50 hover:bg-purple-500/5'}
-            `}
-        >
-            <input {...inputProps} />
-            <div className="flex flex-col items-center gap-4">
-                <Upload className="w-12 h-12 text-gray-400" />
-                {isDragActive ? (
-                    <p className="text-purple-400">Drop the PDF here...</p>
+        <div>
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept=".pdf"
+                className="hidden"
+            />
+            <motion.button
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`
+                    px-4 py-2 rounded-lg flex items-center gap-2 transition-colors
+                    ${isDragging
+                        ? 'bg-green-500 text-white'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }
+                    ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                disabled={isUploading}
+            >
+                {isUploading ? (
+                    <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Uploading...
+                    </>
                 ) : (
-                    <div className="text-center">
-                        <p className="text-gray-400">
-                            Drag & drop a PDF file here, or click to select
-                        </p>
-                        <p className="text-gray-500 text-sm mt-2">
-                            (Only PDF files are accepted)
-                        </p>
-                    </div>
+                    <>
+                        <Upload className="w-4 h-4" />
+                        {isDragging ? 'Drop PDF here' : 'Upload PDF'}
+                    </>
                 )}
-            </div>
+            </motion.button>
         </div>
     );
 } 
