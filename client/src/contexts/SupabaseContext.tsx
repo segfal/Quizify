@@ -7,6 +7,7 @@ import { Database } from '@/types/database.types'
 type DBUser = Database['public']['Tables']['Users']['Row']
 type DBRoom = Database['public']['Tables']['Room']['Row']
 type DBChat = Database['public']['Tables']['Chat']['Row']
+type DBNote = Database['public']['Tables']['Notes']['Row']
 
 type SupabaseContextType = {
   user: DBUser | null
@@ -20,6 +21,9 @@ type SupabaseContextType = {
   getRooms: () => Promise<DBRoom[]>
   sendMessage: (roomId: number, message: string) => Promise<DBChat>
   getMessages: (roomId: number, limit?: number, beforeTimestamp?: string) => Promise<DBChat[]>
+  addNote: (roomId: number, filename: string, filetype: string, url: string) => Promise<DBNote>
+  getNotes: (roomId: number) => Promise<DBNote[]>
+  deleteNote: (noteId: number) => Promise<void>
 }
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
@@ -216,6 +220,83 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
       return data;
+    },
+    addNote: async (roomId: number, filename: string, filetype: string, url: string) => {
+      if (!user) throw new Error('Must be logged in to add notes');
+
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({
+          room_id: roomId,
+          user_id: user.user_id,
+          filename: filename,
+          filetype: filetype,
+          url: url,
+          upload_date: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    getNotes: async (roomId: number) => {
+      const { data, error } = await supabase
+        .from('notes')
+        .select(`
+          note_id,
+          room_id,
+          user_id,
+          filename,
+          filetype,
+          url,
+          upload_date,
+          users:user_id (
+            username
+          )
+        `)
+        .eq('room_id', roomId)
+        .order('upload_date', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    deleteNote: async (noteId: number) => {
+      if (!user) throw new Error('Must be logged in to delete notes');
+
+      // First get the note to check ownership and get the filename
+      const { data: note, error: fetchError } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('note_id', noteId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Check if user owns the note
+      if (note.user_id !== user.user_id) {
+        throw new Error('You can only delete your own notes');
+      }
+
+      // Delete from storage if it's a file
+      if (note.url) {
+        const filename = note.url.split('/').pop();
+        if (filename) {
+          const { error: storageError } = await supabase.storage
+            .from('pdfstore')
+            .remove([filename]);
+          
+          if (storageError) throw storageError;
+        }
+      }
+
+      // Delete the note record
+      const { error: deleteError } = await supabase
+        .from('notes')
+        .delete()
+        .eq('note_id', noteId);
+
+      if (deleteError) throw deleteError;
     }
   }
 
