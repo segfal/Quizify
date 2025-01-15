@@ -9,23 +9,8 @@ import { useSupabase } from '@/contexts/SupabaseContext';
 import { supabase } from '@/utils/supabase/client';
 import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
+import { NotesProps, NoteFile } from '@/interfaces/notes/types';
 
-interface NotesProps {
-    roomId: string;
-    initialContent?: string;
-    onUpdate: (content: string) => void;
-}
-
-interface NoteFile {
-    note_id: number;
-    filename: string;
-    url: string;
-    filetype: string;
-    upload_date: string;
-    users: {
-        username: string;
-    };
-}
 
 export const Notes = ({ roomId, initialContent = '', onUpdate }: NotesProps) => {
     const [content, setContent] = useState(initialContent);
